@@ -1,0 +1,11 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/catalog-read-service ./cmd/main.go"
+bin = "./tmp/catalog-read-service"
+include_ext = ["go", "env"]
+exclude_dir = ["tmp", "vendor"]
+
+[log]
+time = true
