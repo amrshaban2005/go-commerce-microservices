@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/domain"
@@ -95,7 +96,10 @@ func (c *ProductCreatedConsumer) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 
-		case delivery := <-deliveries:
+		case delivery, ok := <-deliveries:
+			if !ok {
+				return errors.New("RabbitMQ deliveries channel closed")
+			}
 			c.handleMessage(ctx, delivery)
 		}
 	}
@@ -115,7 +119,7 @@ func (c *ProductCreatedConsumer) handleMessage(ctx context.Context, delivery amq
 		Name:        event.Name,
 		Description: event.Description,
 		Price:       event.Price,
-		Status: event.Status,
+		Status:      event.Status,
 	}
 
 	err := c.productService.HandleProductCreated(

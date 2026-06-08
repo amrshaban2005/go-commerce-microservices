@@ -2,6 +2,9 @@ package messaging
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"sync"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -9,10 +12,15 @@ import (
 type RabbitMQPublisher struct {
 	channel  *amqp.Channel
 	exchange string
+	returns  <-chan amqp.Return
+	mu       sync.Mutex
 }
 
-func NewRabbitMQPublisher(channel *amqp.Channel, exchange string) (*RabbitMQPublisher, error) {
-	err := channel.ExchangeDeclare(
+func NewRabbitMQPublisher(
+	channel *amqp.Channel,
+	exchange string,
+) (*RabbitMQPublisher, error) {
+	if err := channel.ExchangeDeclare(
 		exchange,
 		"topic",
 		true,
@@ -20,25 +28,39 @@ func NewRabbitMQPublisher(channel *amqp.Channel, exchange string) (*RabbitMQPubl
 		false,
 		false,
 		nil,
-	)
-	if err != nil {
+	); err != nil {
+		return nil, err
+	}
+
+	if err := channel.Confirm(false); err != nil {
 		return nil, err
 	}
 
 	return &RabbitMQPublisher{
 		channel:  channel,
 		exchange: exchange,
+		returns:  channel.NotifyReturn(make(chan amqp.Return, 1)),
 	}, nil
 }
 
-func (p *RabbitMQPublisher) Publish(ctx context.Context, eventType string, payload []byte) error {
-	routingKey := eventRoutingKey(eventType)
+func (p *RabbitMQPublisher) Publish(
+	ctx context.Context,
+	eventType string,
+	payload []byte,
+) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	return p.channel.PublishWithContext(
+	routingKey, err := eventRoutingKey(eventType)
+	if err != nil {
+		return err
+	}
+
+	confirmation, err := p.channel.PublishWithDeferredConfirmWithContext(
 		ctx,
 		p.exchange,
 		routingKey,
-		false,
+		true, // Return the message when it cannot be routed.
 		false,
 		amqp.Publishing{
 			ContentType:  "application/json",
@@ -46,13 +68,41 @@ func (p *RabbitMQPublisher) Publish(ctx context.Context, eventType string, paylo
 			Body:         payload,
 		},
 	)
+	if err != nil {
+		return err
+	}
+
+	acked, err := confirmation.WaitContext(ctx)
+	if err != nil {
+		return err
+	}
+	if !acked {
+		return errors.New("RabbitMQ negatively acknowledged message")
+	}
+
+	// RabbitMQ sends basic.return before the publisher confirmation.
+	select {
+	case returned, ok := <-p.returns:
+		if !ok {
+			return errors.New("RabbitMQ return notification channel closed")
+		}
+
+		return fmt.Errorf(
+			"RabbitMQ could not route message: code=%d reason=%s routing_key=%s",
+			returned.ReplyCode,
+			returned.ReplyText,
+			returned.RoutingKey,
+		)
+	default:
+		return nil
+	}
 }
 
-func eventRoutingKey(eventType string) string {
+func eventRoutingKey(eventType string) (string, error) {
 	switch eventType {
 	case "ProductCreated":
-		return "product.created"
+		return "product.created", nil
 	default:
-		return "event.unknown"
+		return "", fmt.Errorf("unsupported event type: %s", eventType)
 	}
 }

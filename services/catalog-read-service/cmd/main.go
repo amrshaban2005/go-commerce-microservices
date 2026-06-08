@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -77,8 +76,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go consumer.Start(ctx)
-	
+	consumerErrChan := make(chan error, 1)
+	go func() {
+		consumerErrChan <- consumer.Start(ctx)
+	}()
+
 	// run grpc server
 	list, err := net.Listen("tcp", ":"+os.Getenv("GRPC_PORT"))
 	if err != nil {
@@ -89,8 +91,23 @@ func main() {
 	catalogv1.RegisterCatalogReadServiceServer(server, grpcadapter.NewCatalogServer(prodcutService))
 
 	log.Printf("Catalog read service grpc is running on: %s", os.Getenv("GRPC_PORT"))
-	if err = server.Serve(list); err != nil {
-		panic(fmt.Sprintf("failed to connect to grpc: %v", err.Error()))
+
+	grpcErrChan := make(chan error, 1)
+	go func() {
+		grpcErrChan <- server.Serve(list)
+	}()
+
+	select {
+	case err := <-consumerErrChan:
+		if err != nil {
+			log.Fatalf("product-created consumer stopped: %v", err)
+		}
+		log.Fatal("product-created consumer stopped unexpectedly")
+	case err := <-grpcErrChan:
+		if err != nil {
+			log.Fatalf("gRPC server stopped: %v", err)
+		}
+		log.Fatal("gRPC server stopped unexpectedly")
 	}
 
 }

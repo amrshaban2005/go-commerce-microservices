@@ -16,6 +16,7 @@ func sanityCheck() {
 	envProps := []string{
 		"APP_PORT",
 		"CATALOG_READ_GRPC_ADDR",
+		"CATALOG_WRITE_GRPC_ADDR",
 	}
 
 	for _, k := range envProps {
