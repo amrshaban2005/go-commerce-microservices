@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package catalog.v1;
+
+option go_package = "github.com/amrshaban2005/go-commerce-microservices/api/gen/go/catalog/v1;catalogv1";
+
+service CatalogReadService {
+  rpc GetProducts(GetProductsRequest) returns (GetProductsResponse);
+}
+
+service CatalogWriteService {
+  rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse);
+}
+
+message Product {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  double price = 4;
+}
+
+message GetProductsRequest {}
+
+message GetProductsResponse {
+  repeated Product products = 1;
+}
+
+message CreateProductRequest{
+   string name = 1;
+  string description = 2;
+  double price = 3;
+}
+
+message CreateProductResponse{
+  Product product = 1;
+}

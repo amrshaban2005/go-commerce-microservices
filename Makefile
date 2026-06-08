@@ -16,6 +16,9 @@ migrate-up:
 migrate-down:
 	./scripts/migrate-down.sh
 
+proto:
+	./scripts/generate-proto.sh
+
 run-order:
 	cd services/order-service && ../../bin/air
 
@@ -31,8 +34,12 @@ run-catalog-read:
 run-notification:
 	cd services/notification-service && ../../bin/air
 
+run-api-gateway:
+	cd api-gateway && ../bin/air
+
 dev-start:
 	make dev-up
+	sleep 5
 	make migrate-up
 
 dev-stop:

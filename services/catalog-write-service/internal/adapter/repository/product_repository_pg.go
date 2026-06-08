@@ -15,6 +15,7 @@ type ProductDataModel struct {
 	Name        string
 	Description string
 	Price       float64
+	Status      string
 	CreatedAt   time.Time `gorm:"column:created_at"`
 	UpdatedAt   time.Time `gorm:"column:updated_at"`
 }
@@ -31,31 +32,31 @@ func NewProductRepositryPG(db *gorm.DB) port.ProductRepository {
 	return &productRepositryPG{db}
 }
 
-func (r productRepositryPG) FindAll(ctx context.Context) ([]domain.Product, error) {
-	var products []ProductDataModel
+func (r productRepositryPG) CreateWithOutbox(ctx context.Context, product *domain.Product, message *domain.OutboxMessage) error {
 
-	if err := r.db.WithContext(ctx).Find(&products).Error; err != nil {
-		return nil, err
-	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		productDataModel := toProductDataModel(product)
+		if err := tx.Create(&productDataModel).Error; err != nil {
+			return err
+		}
 
-	return toDomainProducts(products), nil
+		outboxMessageDataModel := toOutboxDataModel(message)
+		if err := tx.Create(&outboxMessageDataModel).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+
 }
 
-func toDomainProducts(models []ProductDataModel) []domain.Product {
-	products := make([]domain.Product, 0, len(models))
-	for _, model := range models {
-		products = append(products, toDomainProduct(model))
-	}
-	return products
-}
-
-func toDomainProduct(model ProductDataModel) domain.Product {
-	return domain.Product{
-		ID:          model.ID,
-		Name:        model.Name,
-		Description: model.Description,
-		Price:       model.Price,
-		CreatedAt:   model.CreatedAt,
-		UpdatedAt:   model.UpdatedAt,
+func toProductDataModel(product *domain.Product) ProductDataModel {
+	return ProductDataModel{
+		ID:          product.ID,
+		Name:        product.Name,
+		Description: product.Description,
+		Price:       product.Price,
+		Status:      product.Status,
+		CreatedAt:   product.CreatedAt,
+		UpdatedAt:   product.UpdatedAt,
 	}
 }
