@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS stock_reservations (
     order_id UUID NOT NULL,
     product_id UUID NOT NULL,
     quantity INT NOT NULL CHECK (quantity > 0),
-    status VARCHAR(30) NOT NULL DEFAULT 'RESERVED',
+    status VARCHAR(30) NOT NULL DEFAULT 'RESERVED' CHECK (status IN ('RESERVED', 'RELEASED','FAILED')),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(order_id, product_id)

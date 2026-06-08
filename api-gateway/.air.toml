@@ -1,0 +1,11 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/api-gateway ./cmd/main.go"
+bin = "./tmp/api-gateway"
+include_ext = ["go", "env"]
+exclude_dir = ["tmp", "vendor"]
+
+[log]
+time = true

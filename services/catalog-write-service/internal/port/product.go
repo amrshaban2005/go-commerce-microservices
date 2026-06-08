@@ -7,9 +7,9 @@ import (
 )
 
 type ProductRepository interface {
-	FindAll(ctx context.Context) ([]domain.Product, error)
+	CreateWithOutbox(ctx context.Context, product *domain.Product, message *domain.OutboxMessage) error
 }
 
 type ProductService interface {
-	List(ctx context.Context) ([]domain.Product, error)
+	CreateProduct(ctx context.Context, name, description string, price float64) (*domain.Product, error)
 }
