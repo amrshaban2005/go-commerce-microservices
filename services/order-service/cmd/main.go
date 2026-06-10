@@ -30,8 +30,8 @@ func sanityCheck() {
 		"DB_NAME",
 		"DB_SSLMODE",
 		"RABBITMQ_URL",
-		"RABBITMQ_EXCHANGE",
-		"PRODUCT_CREATED_QUEUE",
+		"RABBITMQ_EXCHANGE_PUBLISHER",
+		"ORDER_CREATED_QUEUE",
 		"OUTBOX_INTERVAL_SECONDS",
 	}
 
@@ -80,7 +80,7 @@ func main() {
 	}
 	defer channel.Close()
 
-	publisher, err := messaging.NewRabbitMQPublisher(channel, os.Getenv("RABBITMQ_EXCHANGE"))
+	publisher, err := messaging.NewRabbitMQPublisher(channel, os.Getenv("RABBITMQ_EXCHANGE_PUBLISHER"))
 	if err != nil {
 		log.Fatal("failed to create rabbitmq publisher: ", err)
 	}
