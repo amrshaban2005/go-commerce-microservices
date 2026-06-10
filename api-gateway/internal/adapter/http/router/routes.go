@@ -12,3 +12,11 @@ func RegisterProductRoutes(rg *gin.RouterGroup, h *handler.ProductHandler) {
 		products.POST("", h.CreateProduct)
 	}
 }
+
+func RegisterOrderRoutes(rg *gin.RouterGroup, h *handler.OrderHandler) {
+	orders := rg.Group("/orders")
+	{
+		//orders.GET("", h.GetProducts)
+		orders.POST("", h.CreateOrder)
+	}
+}

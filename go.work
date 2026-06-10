@@ -5,4 +5,5 @@ use (
 	./api/gen/go
 	./services/catalog-read-service
 	./services/catalog-write-service
+	./services/order-service
 )

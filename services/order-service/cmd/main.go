@@ -8,13 +8,13 @@ import (
 	"os"
 	"time"
 
-	catalogv1 "github.com/amrshaban2005/go-commerce-microservices/api/gen/go/catalog/v1"
-	grpcadapter "github.com/amrshaban2005/go-commerce-microservices/services/catalog-write-service/internal/adapter/grpc"
-	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-write-service/internal/adapter/messaging"
-	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-write-service/internal/adapter/repository"
-	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-write-service/internal/database"
-	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-write-service/internal/service"
-	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-write-service/internal/worker"
+	orderv1 "github.com/amrshaban2005/go-commerce-microservices/api/gen/go/order/v1"
+	grpcadapter "github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/adapter/grpc"
+	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/adapter/messaging"
+	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/adapter/repository"
+	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/database"
+	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/service"
+	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/worker"
 	"github.com/joho/godotenv"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
@@ -31,6 +31,7 @@ func sanityCheck() {
 		"DB_SSLMODE",
 		"RABBITMQ_URL",
 		"RABBITMQ_EXCHANGE",
+		"PRODUCT_CREATED_QUEUE",
 		"OUTBOX_INTERVAL_SECONDS",
 	}
 
@@ -42,7 +43,6 @@ func sanityCheck() {
 }
 
 func main() {
-
 	// load env
 	err := godotenv.Load()
 	if err != nil {
@@ -50,7 +50,7 @@ func main() {
 	}
 	sanityCheck()
 
-	// connect postgress database
+	//connect postgres
 	db, err := database.ConnectPostgres()
 	if err != nil {
 		log.Fatalf("failed to connect to postgres: %v", err.Error())
@@ -63,35 +63,30 @@ func main() {
 	defer sqlDB.Close()
 
 	// initialization
-	productRepo := repository.NewProductRepositryPG(db)
+	orderRepo := repository.NewOrderRepositoryPG(db)
 	outboxRepo := repository.NewOutboxRepositoryPG(db)
-	productService := service.NewProductService(productRepo)
+	orderService := service.NewOrderService(orderRepo)
 
-	// start rabbitmq/messaging
+	// run rabbitmq
 	rabbitConn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 	if err != nil {
 		log.Fatal("failed to connect rabbitmq: ", err)
 	}
 	defer rabbitConn.Close()
 
-	rabbitChannel, err := rabbitConn.Channel()
+	channel, err := rabbitConn.Channel()
 	if err != nil {
 		log.Fatal("failed to open rabbitmq channel: ", err)
 	}
-	defer rabbitChannel.Close()
+	defer channel.Close()
 
-	publisher, err := messaging.NewRabbitMQPublisher(rabbitChannel, os.Getenv("RABBITMQ_EXCHANGE"))
+	publisher, err := messaging.NewRabbitMQPublisher(channel, os.Getenv("RABBITMQ_EXCHANGE"))
 	if err != nil {
 		log.Fatal("failed to create rabbitmq publisher: ", err)
 	}
 
-	outboxWorker := worker.NewOutboxWorker(
-		outboxRepo,
-		publisher,
-		5*time.Second,
-		20,
-	)
-
+	outboxWorker := worker.NewOutboxWorker(outboxRepo, publisher, 5*time.Second, 20)
+	
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -104,11 +99,11 @@ func main() {
 	}
 
 	server := grpc.NewServer()
-	catalogv1.RegisterCatalogWriteServiceServer(server, grpcadapter.NewCatalogServer(productService))
+	orderv1.RegisterOrderServiceServer(server, grpcadapter.NewOrderServer(orderService))
+	// todo register service
 
-	log.Printf("Catalog write service grpc is running on: %s", os.Getenv("GRPC_PORT"))
+	log.Printf("Order service grpc is running on: %s", os.Getenv("GRPC_PORT"))
 	if err = server.Serve(list); err != nil {
 		panic(fmt.Sprintf("failed to connect to grpc: %v", err.Error()))
 	}
-
 }
