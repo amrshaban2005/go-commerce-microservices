@@ -37,22 +37,30 @@ func main() {
 	// register routes, run server
 	catalogReadClient, closeReadCatalogClient, err := grpcclient.NewReadCatalogClient(os.Getenv("CATALOG_READ_GRPC_ADDR"))
 	if err != nil {
-		log.Fatalf("failed to connect to grc server: %v", err.Error())
+		log.Fatalf("failed to connect to catalog read grpc server: %v", err.Error())
 	}
 	defer closeReadCatalogClient()
 
 	catalogWriteClient, closeWriteCatalogClient, err := grpcclient.NewWriteCatalogClient(os.Getenv("CATALOG_WRITE_GRPC_ADDR"))
 	if err != nil {
-		log.Fatalf("failed to connect to grc server: %v", err.Error())
+		log.Fatalf("failed to connect to catalog write grpc server: %v", err.Error())
 	}
 	defer closeWriteCatalogClient()
 
+	orderClient, closeOrderClient, err := grpcclient.NewOrderClient(os.Getenv("CATALOG_ORDER_GRPC_ADDR"))
+	if err != nil {
+		log.Fatalf("failed to connect to order grpc server: %v", err.Error())
+	}
+	defer closeOrderClient()
+
 	prodcutHandler := handler.NewProductHandler(catalogReadClient, catalogWriteClient)
+	orderHandler := handler.NewOrderHandler(orderClient)
 
 	r := gin.Default()
 	api := r.Group("/api/v1")
 
 	router.RegisterProductRoutes(api, prodcutHandler)
+	router.RegisterOrderRoutes(api, orderHandler)
 
 	addr := ":" + os.Getenv("APP_PORT")
 	log.Printf("api gateway is running on: %s", addr)

@@ -16,7 +16,10 @@ type RabbitMQPublisher struct {
 	mu       sync.Mutex
 }
 
-func NewRabbitMQPublisher(channel *amqp.Channel, exchange string) (*RabbitMQPublisher, error) {
+func NewRabbitMQPublisher(
+	channel *amqp.Channel,
+	exchange string,
+) (*RabbitMQPublisher, error) {
 	if err := channel.ExchangeDeclare(
 		exchange,
 		"topic",
@@ -49,18 +52,12 @@ func (p *RabbitMQPublisher) Publish(ctx context.Context, eventType string, paylo
 		return err
 	}
 
-	confirmation, err := p.channel.PublishWithDeferredConfirmWithContext(
-		ctx,
-		p.exchange,
-		routingKey,
-		true, // Return the message when it cannot be routed.
-		false,
-		amqp.Publishing{
-			ContentType:  "application/json",
-			DeliveryMode: amqp.Persistent,
-			Body:         payload,
-		},
-	)
+	confirmation, err := p.channel.PublishWithDeferredConfirmWithContext(ctx, p.exchange, routingKey, true, false, amqp.Publishing{
+		ContentType:  "application/json",
+		DeliveryMode: amqp.Persistent,
+		Body:         payload,
+	})
+
 	if err != nil {
 		return err
 	}
@@ -73,13 +70,11 @@ func (p *RabbitMQPublisher) Publish(ctx context.Context, eventType string, paylo
 		return errors.New("RabbitMQ negatively acknowledged message")
 	}
 
-	// RabbitMQ sends basic.return before the publisher confirmation.
 	select {
 	case returned, ok := <-p.returns:
 		if !ok {
 			return errors.New("RabbitMQ return notification channel closed")
 		}
-
 		return fmt.Errorf(
 			"RabbitMQ could not route message: code=%d reason=%s routing_key=%s",
 			returned.ReplyCode,
@@ -93,8 +88,10 @@ func (p *RabbitMQPublisher) Publish(ctx context.Context, eventType string, paylo
 
 func eventRoutingKey(eventType string) (string, error) {
 	switch eventType {
-	case "ProductCreated":
-		return "product.created", nil
+	case "StockReserved":
+		return "stock.reserved", nil
+	case "StockReservationFailed":
+		return "stock.notreserved", nil
 	default:
 		return "", fmt.Errorf("unsupported event type: %s", eventType)
 	}
