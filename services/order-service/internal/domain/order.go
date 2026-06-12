@@ -7,7 +7,11 @@ import (
 	"github.com/google/uuid"
 )
 
-const OrderStatusPending = "PENDING"
+const (
+	OrderStatusPending   = "PENDING"
+	OrderStatusConfirmed = "CONFIRMED"
+	OrderStatusFailed    = "FAILED"
+)
 
 var (
 	ErrOrderItemsRequired = errors.New("order must have at least one item")

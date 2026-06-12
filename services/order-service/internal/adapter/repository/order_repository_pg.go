@@ -83,6 +83,28 @@ func (r orderRepositoryPG) CreateWithOutbox(ctx context.Context, order *domain.O
 
 }
 
+func (r orderRepositoryPG) ConfirmOrder(ctx context.Context, orderID uuid.UUID) error {
+	return r.db.WithContext(ctx).
+		Model(&OrderDataModel{}).
+		Where("id = ? AND status = ?", orderID, domain.OrderStatusPending).
+		Updates(map[string]any{
+			"status":     domain.OrderStatusConfirmed,
+			"updated_at": time.Now().UTC(),
+		}).
+		Error
+}
+
+func (r orderRepositoryPG) RejectOrder(ctx context.Context, orderID uuid.UUID) error {
+	return r.db.WithContext(ctx).
+		Model(&OrderDataModel{}).
+		Where("id = ? AND status = ?", orderID, domain.OrderStatusPending).
+		Updates(map[string]any{
+			"status":     domain.OrderStatusFailed,
+			"updated_at": time.Now().UTC(),
+		}).
+		Error
+}
+
 func toOrderDataModel(order *domain.Order) OrderDataModel {
 	return OrderDataModel{
 		ID:          order.ID,

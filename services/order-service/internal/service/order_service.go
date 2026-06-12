@@ -12,11 +12,12 @@ import (
 )
 
 type orderService struct {
-	repo port.OrderRespository
+	orderRepo port.OrderRespository
+	inboxRepo port.InboxRepository
 }
 
-func NewOrderService(repo port.OrderRespository) port.OrderService {
-	return &orderService{repo}
+func NewOrderService(orderRepo port.OrderRespository, inboxRepo port.InboxRepository) port.OrderService {
+	return &orderService{orderRepo, inboxRepo}
 }
 
 func (s *orderService) CreateOrder(ctx context.Context, customerID uuid.UUID, itemsInput []dto.CreateOrderItemInput) (*domain.Order, error) {
@@ -57,11 +58,43 @@ func (s *orderService) CreateOrder(ctx context.Context, customerID uuid.UUID, it
 		CreatedAt:     time.Now().UTC(),
 	}
 
-	err = s.repo.CreateWithOutbox(ctx, order, outboxMessage)
+	err = s.orderRepo.CreateWithOutbox(ctx, order, outboxMessage)
 	if err != nil {
 		return nil, err
 	}
 	return order, nil
+}
+
+func (s *orderService) HandleConfirmOrder(ctx context.Context, orderID uuid.UUID, messageID uuid.UUID, payload []byte) error {
+	isProcessed, err := s.inboxRepo.IsProcessed(ctx, messageID)
+	if err != nil {
+		return err
+	}
+	if isProcessed {
+		return nil
+	}
+	// handle confirm order
+	if err := s.orderRepo.ConfirmOrder(ctx, orderID); err != nil {
+		return err
+	}
+
+	return s.inboxRepo.SaveProcessed(ctx, messageID, "StockReserved", payload)
+}
+
+func (s *orderService) HandleRejectOrder(ctx context.Context, orderID uuid.UUID, messageID uuid.UUID, payload []byte) error {
+	isProcessed, err := s.inboxRepo.IsProcessed(ctx, messageID)
+	if err != nil {
+		return err
+	}
+	if isProcessed {
+		return nil
+	}
+	// handle reject order
+	if err := s.orderRepo.RejectOrder(ctx, orderID); err != nil {
+		return err
+	}
+
+	return s.inboxRepo.SaveProcessed(ctx, messageID, "StockReservationFailed", payload)
 }
 
 func reserveStockItems(items []domain.OrderItems) []map[string]any {

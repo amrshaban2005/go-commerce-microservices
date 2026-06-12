@@ -94,12 +94,20 @@ func main() {
 
 	go outboxWorker.Start(ctx)
 
+	errCh := make(chan error, 1)
 	go func() {
-		if err := consumer.Start(ctx); err != nil {
-			log.Fatal("reserve stock consumer stopped with error: ", err)
-		}
+		errCh <- consumer.Start(ctx)
 	}()
+
 	log.Println("inventory-service started")
-	select {}
+	select {
+	case err := <-errCh:
+		if err != nil {
+			log.Println("consumer stopped with error:", err)
+		}
+		log.Println("consumer stopped")
+	case <-ctx.Done():
+		log.Println("inventory-service stopping")
+	}
 
 }

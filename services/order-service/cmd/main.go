@@ -31,7 +31,8 @@ func sanityCheck() {
 		"DB_SSLMODE",
 		"RABBITMQ_URL",
 		"RABBITMQ_EXCHANGE_PUBLISHER",
-		"ORDER_CREATED_QUEUE",
+		"STOCK_RESERVED_QUEUE",
+		"STOCK_NOT_RESERVED_QUEUE",
 		"OUTBOX_INTERVAL_SECONDS",
 	}
 
@@ -65,7 +66,8 @@ func main() {
 	// initialization
 	orderRepo := repository.NewOrderRepositoryPG(db)
 	outboxRepo := repository.NewOutboxRepositoryPG(db)
-	orderService := service.NewOrderService(orderRepo)
+	inboxRepo := repository.NewInboxMessageRepository(db)
+	orderService := service.NewOrderService(orderRepo, inboxRepo)
 
 	// run rabbitmq
 	rabbitConn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
@@ -74,24 +76,37 @@ func main() {
 	}
 	defer rabbitConn.Close()
 
-	channel, err := rabbitConn.Channel()
-	if err != nil {
-		log.Fatal("failed to open rabbitmq channel: ", err)
-	}
-	defer channel.Close()
+	publishChannel, _ := rabbitConn.Channel()
+	consumerChannel1, _ := rabbitConn.Channel()
+	consumerChannel2, _ := rabbitConn.Channel()
 
-	publisher, err := messaging.NewRabbitMQPublisher(channel, os.Getenv("RABBITMQ_EXCHANGE_PUBLISHER"))
+	defer publishChannel.Close()
+	defer consumerChannel1.Close()
+	defer consumerChannel2.Close()
+
+	// publisher
+	publisher, err := messaging.NewRabbitMQPublisher(publishChannel, os.Getenv("RABBITMQ_EXCHANGE_PUBLISHER"))
 	if err != nil {
 		log.Fatal("failed to create rabbitmq publisher: ", err)
 	}
 
 	outboxWorker := worker.NewOutboxWorker(outboxRepo, publisher, 5*time.Second, 20)
-	
+	// consumers
+	stockReservedConsumer := messaging.NewStockReservedConsumer(consumerChannel1, os.Getenv("RABBITMQ_EXCHANGE_CONSUMER"), os.Getenv("STOCK_RESERVED_QUEUE"), orderService)
+	stockNotReservedConsumer := messaging.NewStockNotReservedConsumer(consumerChannel2, os.Getenv("RABBITMQ_EXCHANGE_CONSUMER"), os.Getenv("STOCK_NOT_RESERVED_QUEUE"), orderService)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	go outboxWorker.Start(ctx)
 
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- messaging.Start(ctx, messaging.Consumers{
+			StockReserved:    stockReservedConsumer,
+			StockNotReserved: stockNotReservedConsumer,
+		})
+	}()
 	// run grpc server
 	list, err := net.Listen("tcp", ":"+os.Getenv("GRPC_PORT"))
 	if err != nil {
@@ -100,10 +115,20 @@ func main() {
 
 	server := grpc.NewServer()
 	orderv1.RegisterOrderServiceServer(server, grpcadapter.NewOrderServer(orderService))
-	// todo register service
 
 	log.Printf("Order service grpc is running on: %s", os.Getenv("GRPC_PORT"))
 	if err = server.Serve(list); err != nil {
 		panic(fmt.Sprintf("failed to connect to grpc: %v", err.Error()))
+	}
+
+	select {
+	case err := <-errChan:
+		if err != nil {
+			log.Println("consumer stopped with error:", err)
+		}
+		log.Println("consumer stopped")
+
+	case <-ctx.Done():
+		log.Println("consumer stopping")
 	}
 }
