@@ -5,54 +5,53 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
+	"strconv"
 	"time"
 
 	orderv1 "github.com/amrshaban2005/go-commerce-microservices/api/gen/go/order/v1"
+	"github.com/amrshaban2005/go-commerce-microservices/pkg/configloader"
+	appconfig "github.com/amrshaban2005/go-commerce-microservices/services/order-service/config"
 	grpcadapter "github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/adapter/grpc"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/adapter/messaging"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/adapter/repository"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/database"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/service"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/worker"
-	"github.com/joho/godotenv"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 )
 
-func sanityCheck() {
-	envProps := []string{
-		"GRPC_PORT",
-		"DB_HOST",
-		"DB_PORT",
-		"DB_USER",
-		"DB_PASSWORD",
-		"DB_NAME",
-		"DB_SSLMODE",
-		"RABBITMQ_URL",
-		"RABBITMQ_EXCHANGE_PUBLISHER",
-		"STOCK_RESERVED_QUEUE",
-		"STOCK_NOT_RESERVED_QUEUE",
-		"OUTBOX_INTERVAL_SECONDS",
-	}
-
-	for _, k := range envProps {
-		if os.Getenv(k) == "" {
-			log.Fatalf("Enviroment variable %s not provided ", k)
-		}
-	}
-}
-
 func main() {
-	// load env
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("No env. file found.")
+	if err := configloader.LoadDotEnv(); err != nil {
+		log.Println("No local .env file found; using system environment variables")
 	}
-	sanityCheck()
+
+	appOptions, err := appconfig.LoadAppOptions()
+	if err != nil {
+		log.Fatalf("failed to load app options: %v", err)
+	}
+	if err := appOptions.Validate(); err != nil {
+		log.Fatalf("invalid app options: %v", err)
+	}
+
+	postgresOptions, err := database.LoadPostgresOptions()
+	if err != nil {
+		log.Fatalf("failed to load postgres options: %v", err)
+	}
+	if err := postgresOptions.Validate(); err != nil {
+		log.Fatalf("invalid postgres options: %v", err)
+	}
+
+	rabbitMQOptions, err := messaging.LoadRabbitMQOptions()
+	if err != nil {
+		log.Fatalf("failed to load rabbit mq options: %v", err)
+	}
+	if err := rabbitMQOptions.Validate(); err != nil {
+		log.Fatalf("invalid rabbit mq options: %v", err)
+	}
 
 	//connect postgres
-	db, err := database.ConnectPostgres()
+	db, err := database.ConnectPostgres(postgresOptions)
 	if err != nil {
 		log.Fatalf("failed to connect to postgres: %v", err.Error())
 	}
@@ -70,7 +69,7 @@ func main() {
 	orderService := service.NewOrderService(orderRepo, inboxRepo)
 
 	// run rabbitmq
-	rabbitConn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
+	rabbitConn, err := amqp.Dial(rabbitMQOptions.URL)
 	if err != nil {
 		log.Fatal("failed to connect rabbitmq: ", err)
 	}
@@ -85,15 +84,19 @@ func main() {
 	defer consumerChannel2.Close()
 
 	// publisher
-	publisher, err := messaging.NewRabbitMQPublisher(publishChannel, os.Getenv("RABBITMQ_EXCHANGE_PUBLISHER"))
+	publisher, err := messaging.NewRabbitMQPublisher(publishChannel, rabbitMQOptions.PublisherExchange)
 	if err != nil {
 		log.Fatal("failed to create rabbitmq publisher: ", err)
 	}
+	interval, err := strconv.Atoi(rabbitMQOptions.OutboxIntervalSeconds)
+	if err != nil {
+		log.Fatal("failed to convert interval: ", err)
+	}
 
-	outboxWorker := worker.NewOutboxWorker(outboxRepo, publisher, 5*time.Second, 20)
+	outboxWorker := worker.NewOutboxWorker(outboxRepo, publisher, time.Duration(interval), 20)
 	// consumers
-	stockReservedConsumer := messaging.NewStockReservedConsumer(consumerChannel1, os.Getenv("RABBITMQ_EXCHANGE_CONSUMER"), os.Getenv("STOCK_RESERVED_QUEUE"), orderService)
-	stockNotReservedConsumer := messaging.NewStockNotReservedConsumer(consumerChannel2, os.Getenv("RABBITMQ_EXCHANGE_CONSUMER"), os.Getenv("STOCK_NOT_RESERVED_QUEUE"), orderService)
+	stockReservedConsumer := messaging.NewStockReservedConsumer(consumerChannel1, rabbitMQOptions.ConsumerExchange, rabbitMQOptions.StockReservedQueue, orderService)
+	stockNotReservedConsumer := messaging.NewStockNotReservedConsumer(consumerChannel2, rabbitMQOptions.ConsumerExchange, rabbitMQOptions.StockNotReservedQueue, orderService)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -108,7 +111,7 @@ func main() {
 		})
 	}()
 	// run grpc server
-	list, err := net.Listen("tcp", ":"+os.Getenv("GRPC_PORT"))
+	list, err := net.Listen("tcp", ":"+appOptions.GRPCPort)
 	if err != nil {
 		log.Fatalf("failed to listen to tcp: %v", err.Error())
 	}
@@ -116,7 +119,7 @@ func main() {
 	server := grpc.NewServer()
 	orderv1.RegisterOrderServiceServer(server, grpcadapter.NewOrderServer(orderService))
 
-	log.Printf("Order service grpc is running on: %s", os.Getenv("GRPC_PORT"))
+	log.Printf("Order service grpc is running on: %s", appOptions.GRPCPort)
 	if err = server.Serve(list); err != nil {
 		panic(fmt.Sprintf("failed to connect to grpc: %v", err.Error()))
 	}

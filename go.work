@@ -3,6 +3,7 @@ go 1.26.3
 use (
 	./api-gateway
 	./api/gen/go
+	./pkg
 	./services/catalog-read-service
 	./services/catalog-write-service
 	./services/inventory-service

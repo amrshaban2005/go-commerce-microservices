@@ -1,0 +1,21 @@
+{
+  "appOptions": {
+    "grpcPort": "6005"
+  },
+  "postgresOptions": {
+    "host": "127.0.0.1",
+    "port": "5432",
+    "user": "order_user",
+    "password": "",
+    "database": "order_db",
+    "sslMode": "disable"
+  },
+  "rabbitMQOptions": {
+    "url": "",
+    "publisherExchange": "order.events",
+    "consumerExchange": "inventory.events",
+    "stockReservedQueue": "order-read.inventory-reserved",
+    "stockNotReservedQueue": "order-read.inventory-notreserved",
+    "outboxIntervalSeconds": "5"
+  }
+}
