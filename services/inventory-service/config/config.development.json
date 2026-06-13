@@ -1,0 +1,17 @@
+{
+  "postgresOptions": {
+    "host": "127.0.0.1",
+    "port": "5432",
+    "user": "inventory_user",
+    "password": "",
+    "database": "inventory_db",
+    "sslMode": "disable"
+  },
+  "rabbitMQOptions": {
+    "url": "",
+    "consumerExchange": "order.events",
+    "publisherExchange": "inventory.events",
+    "reserveStockQueue": "inventory-read.order-events",
+    "outboxIntervalSeconds": 5
+  }
+}

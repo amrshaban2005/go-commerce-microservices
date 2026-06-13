@@ -5,51 +5,54 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 
 	catalogv1 "github.com/amrshaban2005/go-commerce-microservices/api/gen/go/catalog/v1"
+	"github.com/amrshaban2005/go-commerce-microservices/pkg/configloader"
+	appconfig "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/config"
 	grpcadapter "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/adapter/grpc"
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/adapter/messaging"
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/adapter/repository"
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/database"
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/service"
-	"github.com/joho/godotenv"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 )
 
-func sanityCheck() {
-	envProps := []string{
-		"GRPC_PORT",
-		"MONGO_URI",
-		"MONGO_DATABASE",
-		"RABBITMQ_URL",
-		"RABBITMQ_EXCHANGE",
-		"PRODUCT_CREATED_QUEUE",
-	}
-
-	for _, k := range envProps {
-		if os.Getenv(k) == "" {
-			log.Fatalf("Enviroment variable %s not provided ", k)
-		}
-	}
-}
-
 func main() {
-
-	// load env
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("No env. file found.")
+	if err := configloader.LoadDotEnv(); err != nil {
+		log.Println("No local .env file found; using system environment variables")
 	}
-	sanityCheck()
+
+	appOptions, err := appconfig.LoadAppOptions()
+	if err != nil {
+		log.Fatalf("failed to load app options: %v", err)
+	}
+	if err := appOptions.Validate(); err != nil {
+		log.Fatalf("invalid app options: %v", err)
+	}
+
+	mongoOptions, err := database.LoadMongoOptions()
+	if err != nil {
+		log.Fatalf("failed to load mongo options: %v", err)
+	}
+	if err := mongoOptions.Validate(); err != nil {
+		log.Fatalf("invalid mongo options: %v", err)
+	}
+
+	rabbitMQOptions, err := messaging.LoadRabbitMQOptions()
+	if err != nil {
+		log.Fatalf("failed to load rabbit mq options: %v", err)
+	}
+	if err := rabbitMQOptions.Validate(); err != nil {
+		log.Fatalf("invalid rabbit mq options: %v", err)
+	}
 
 	// connect mongo db
-	client, err := database.ConnectMongo(os.Getenv("MONGO_URI"))
+	client, err := database.ConnectMongo(mongoOptions)
 	if err != nil {
 		log.Fatalf("failed to connect mongo: %v", err.Error())
 	}
-	db := client.Database(os.Getenv("MONGO_DATABASE"))
+	db := client.Database(mongoOptions.Database)
 
 	// intialize
 	productRepo := repository.NewProductRepositoryMongo(db)
@@ -60,7 +63,7 @@ func main() {
 	prodcutService := service.NewProductService(productRepo, inboxRepo)
 
 	// run rabbitmq
-	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
+	conn, err := amqp.Dial(rabbitMQOptions.URL)
 	if err != nil {
 		log.Fatalf("failed to connect to rabbit mq: %v", err.Error())
 	}
@@ -72,7 +75,7 @@ func main() {
 	}
 	defer channel.Close()
 
-	consumer := messaging.NewProductCreatedConsumer(channel, os.Getenv("RABBITMQ_EXCHANGE"), os.Getenv("PRODUCT_CREATED_QUEUE"), prodcutService)
+	consumer := messaging.NewProductCreatedConsumer(channel, rabbitMQOptions.Exchange, rabbitMQOptions.ProductCreatedQueue, prodcutService)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -83,7 +86,7 @@ func main() {
 	}()
 
 	// run grpc server
-	list, err := net.Listen("tcp", ":"+os.Getenv("GRPC_PORT"))
+	list, err := net.Listen("tcp", ":"+appOptions.GRPCPort)
 	if err != nil {
 		log.Fatalf("failed to listen to tcp: %v", err.Error())
 	}
@@ -91,7 +94,7 @@ func main() {
 	server := grpc.NewServer()
 	catalogv1.RegisterCatalogReadServiceServer(server, grpcadapter.NewCatalogServer(prodcutService))
 
-	log.Printf("Catalog read service grpc is running on: %s", os.Getenv("GRPC_PORT"))
+	log.Printf("Catalog read service grpc is running on: %s", appOptions.GRPCPort)
 	if err = server.Serve(list); err != nil {
 		panic(fmt.Sprintf("failed to connect to grpc: %v", err.Error()))
 	}

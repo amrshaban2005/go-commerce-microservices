@@ -1,0 +1,14 @@
+{
+  "appOptions": {
+    "grpcPort": "6001"
+  },
+  "mongoOptions": {
+    "uri": "",
+    "database": "catalog_read_db"
+  },
+  "rabbitMQOptions": {
+    "url": "",
+    "exchange": "catalog.events",
+    "productCreatedQueue": "catalog-read.product-created"
+  }
+}

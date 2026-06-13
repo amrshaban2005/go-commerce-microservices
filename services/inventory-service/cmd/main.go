@@ -3,50 +3,40 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 
+	"github.com/amrshaban2005/go-commerce-microservices/pkg/configloader"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/adapter/messaging"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/adapter/repository"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/database"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/service"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/worker"
-	"github.com/joho/godotenv"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func sanityCheck() {
-	envProps := []string{
-		"GRPC_PORT",
-		"DB_HOST",
-		"DB_PORT",
-		"DB_USER",
-		"DB_PASSWORD",
-		"DB_NAME",
-		"DB_SSLMODE",
-		"RABBITMQ_URL",
-		"RABBITMQ_EXCHANGE_CONSUMER",
-		"RESERVE_STOCK_QUEUE",
-		"OUTBOX_INTERVAL_SECONDS",
-	}
-
-	for _, k := range envProps {
-		if os.Getenv(k) == "" {
-			log.Fatalf("Enviroment variable %s not provided ", k)
-		}
-	}
-}
-
 func main() {
-	// load env
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("No env. file found.")
+	if err := configloader.LoadDotEnv(); err != nil {
+		log.Println("No local .env file found; using system environment variables")
 	}
-	sanityCheck()
+
+	postgresOptions, err := database.LoadPostgresOptions()
+	if err != nil {
+		log.Fatalf("failed to load postgres options: %v", err)
+	}
+	if err := postgresOptions.Validate(); err != nil {
+		log.Fatalf("invalid postgres options: %v", err)
+	}
+
+	rabbitMQOptions, err := messaging.LoadRabbitMQOptions()
+	if err != nil {
+		log.Fatalf("failed to load rabbit mq options: %v", err)
+	}
+	if err := rabbitMQOptions.Validate(); err != nil {
+		log.Fatalf("invalid rabbit mq options: %v", err)
+	}
 
 	//connect postgres
-	db, err := database.ConnectPostgres()
+	db, err := database.ConnectPostgres(postgresOptions)
 	if err != nil {
 		log.Fatalf("failed to connect to postgres: %v", err.Error())
 	}
@@ -62,7 +52,7 @@ func main() {
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	outboxRepo := repository.NewOutboxRepositoryPG(db)
 	// run rabbitmq
-	rabbitConn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
+	rabbitConn, err := amqp.Dial(rabbitMQOptions.URL)
 	if err != nil {
 		log.Fatal("failed to connect rabbitmq: ", err)
 	}
@@ -80,17 +70,17 @@ func main() {
 	}
 	defer publisherChannel.Close()
 
-	consumer := messaging.NewReserveStockRequestedConsumer(consumerChannel, os.Getenv("RABBITMQ_EXCHANGE_CONSUMER"), os.Getenv("RESERVE_STOCK_QUEUE"), inventoryService)
+	consumer := messaging.NewReserveStockRequestedConsumer(consumerChannel, rabbitMQOptions.ConsumerExchange, rabbitMQOptions.ReserveStockQueue, inventoryService)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	publisher, err := messaging.NewRabbitMQPublisher(publisherChannel, os.Getenv("RABBITMQ_EXCHANGE_PUBLISHER"))
+	publisher, err := messaging.NewRabbitMQPublisher(publisherChannel, rabbitMQOptions.PublisherExchange)
 	if err != nil {
 		log.Fatal("failed to create rabbitmq publisher: ", err)
 	}
 
-	outboxWorker := worker.NewOutboxWorker(outboxRepo, publisher, 5*time.Second, 20)
+	outboxWorker := worker.NewOutboxWorker(outboxRepo, publisher, time.Duration(rabbitMQOptions.OutboxIntervalSeconds)*time.Second, 20)
 
 	go outboxWorker.Start(ctx)
 

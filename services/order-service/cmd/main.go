@@ -88,12 +88,8 @@ func main() {
 	if err != nil {
 		log.Fatal("failed to create rabbitmq publisher: ", err)
 	}
-	interval, err := strconv.Atoi(rabbitMQOptions.OutboxIntervalSeconds)
-	if err != nil {
-		log.Fatal("failed to convert interval: ", err)
-	}
 
-	outboxWorker := worker.NewOutboxWorker(outboxRepo, publisher, time.Duration(interval), 20)
+	outboxWorker := worker.NewOutboxWorker(outboxRepo, publisher, time.Duration(rabbitMQOptions.OutboxIntervalSeconds)*time.Second, 20)
 	// consumers
 	stockReservedConsumer := messaging.NewStockReservedConsumer(consumerChannel1, rabbitMQOptions.ConsumerExchange, rabbitMQOptions.StockReservedQueue, orderService)
 	stockNotReservedConsumer := messaging.NewStockNotReservedConsumer(consumerChannel2, rabbitMQOptions.ConsumerExchange, rabbitMQOptions.StockNotReservedQueue, orderService)

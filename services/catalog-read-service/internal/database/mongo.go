@@ -10,9 +10,9 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-func ConnectMongo(uri string) (*mongo.Client, error) {
+func ConnectMongo(config *MongoOptions) (*mongo.Client, error) {
 
-	client, err := mongo.Connect(options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(options.Client().ApplyURI(config.URI))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect mongo: %w", err)
 	}

@@ -1,0 +1,18 @@
+{
+  "appOptions": {
+    "grpcPort": "6002"
+  },
+  "postgresOptions": {
+    "host": "127.0.0.1",
+    "port": "5432",
+    "user": "catalog_write_user",
+    "password": "",
+    "database": "catalog_write_db",
+    "sslMode": "disable"
+  },
+  "rabbitMQOptions": {
+    "url": "",
+    "exchange": "catalog.events",
+    "outboxIntervalSeconds": 5
+  }
+}

@@ -8,10 +8,9 @@ import (
 
 type RabbitMQOptions struct {
 	URL                   string `mapstructure:"url"`
-	PublisherExchange     string `mapstructure:"publisherExchange"`
 	ConsumerExchange      string `mapstructure:"consumerExchange"`
-	StockReservedQueue    string `mapstructure:"stockReservedQueue"`
-	StockNotReservedQueue string `mapstructure:"stockNotReservedQueue"`
+	PublisherExchange     string `mapstructure:"publisherExchange"`
+	ReserveStockQueue     string `mapstructure:"reserveStockQueue"`
 	OutboxIntervalSeconds int    `mapstructure:"outboxIntervalSeconds"`
 }
 
@@ -20,10 +19,9 @@ func LoadRabbitMQOptions() (*RabbitMQOptions, error) {
 		"rabbitMQOptions",
 		map[string]string{
 			"url":                   "RABBITMQ_URL",
-			"publisherExchange":     "RABBITMQ_EXCHANGE_PUBLISHER",
 			"consumerExchange":      "RABBITMQ_EXCHANGE_CONSUMER",
-			"stockReservedQueue":    "STOCK_RESERVED_QUEUE",
-			"stockNotReservedQueue": "STOCK_NOT_RESERVED_QUEUE",
+			"publisherExchange":     "RABBITMQ_EXCHANGE_PUBLISHER",
+			"reserveStockQueue":     "RESERVE_STOCK_QUEUE",
 			"outboxIntervalSeconds": "OUTBOX_INTERVAL_SECONDS",
 		},
 	)
@@ -35,10 +33,9 @@ func (options *RabbitMQOptions) Validate() error {
 		value string
 	}{
 		{name: "url", value: options.URL},
-		{name: "publisherExchange", value: options.PublisherExchange},
 		{name: "consumerExchange", value: options.ConsumerExchange},
-		{name: "stockReservedQueue", value: options.StockReservedQueue},
-		{name: "stockNotReservedQueue", value: options.StockNotReservedQueue},
+		{name: "publisherExchange", value: options.PublisherExchange},
+		{name: "reserveStockQueue", value: options.ReserveStockQueue},
 	}
 
 	for _, field := range required {
