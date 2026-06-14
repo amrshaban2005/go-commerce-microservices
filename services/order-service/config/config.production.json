@@ -3,7 +3,7 @@
     "grpcPort": "6005"
   },
   "postgresOptions": {
-    "host": "127.0.0.1",
+    "host": "postgres",
     "port": "5432",
     "user": "order_user",
     "password": "",

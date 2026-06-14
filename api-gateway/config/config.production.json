@@ -1,0 +1,8 @@
+{
+  "appOptions": {
+    "appPort": "8080",
+    "catalogReadGrpcAddr":"catalog-read-service:6001",
+    "catalogWriteGrpcAddr":"catalog-write-service:6002",
+    "orderGrpcUrl":"order-service:6005"
+  }
+}

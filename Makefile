@@ -37,7 +37,11 @@ run-notification:
 run-api-gateway:
 	cd api-gateway && ../bin/air
 
+run-docker-build:
+	./scripts/build-images.sh
+
 dev-start:
+	make run-docker-build
 	make dev-up
 	sleep 5
 	make migrate-up

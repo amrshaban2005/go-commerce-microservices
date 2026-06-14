@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS outbox_messages (
     processed_at TIMESTAMP NULL
 );
 
-
+CREATE INDEX IF NOT EXISTS idx_outbox_unprocessed_created_at
+ON outbox_messages (processed_at, created_at);
 -- +goose Down
 DROP TABLE IF EXISTS outbox_messages;

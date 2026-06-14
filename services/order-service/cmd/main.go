@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"strconv"
 	"time"
 
 	orderv1 "github.com/amrshaban2005/go-commerce-microservices/api/gen/go/order/v1"
