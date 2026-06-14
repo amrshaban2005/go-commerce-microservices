@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go checks
+    runs-on: ubuntu-latest
+    env:
+      MODULES: >-
+        api-gateway
+        api/gen/go
+        pkg
+        services/catalog-read-service
+        services/catalog-write-service
+        services/inventory-service
+        services/order-service
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            **/go.sum
+            go.work.sum
+
+      - name: Check formatting
+        run: |
+          unformatted="$(gofmt -l $(git ls-files '*.go'))"
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Run vet
+        run: |
+          for module in $MODULES; do
+            echo "Vetting $module"
+            (cd "$module" && go vet ./...)
+          done
+
+      - name: Run tests
+        run: |
+          for module in $MODULES; do
+            echo "Testing $module"
+            (cd "$module" && go test ./...)
+          done
+
+      - name: Compile workspace
+        run: |
+          for module in $MODULES; do
+            echo "Building $module"
+            (cd "$module" && go build ./...)
+          done

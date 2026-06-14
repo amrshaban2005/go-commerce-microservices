@@ -16,4 +16,3 @@ type OutboxMessage struct {
 	CreatedAt     time.Time
 	ProcessedAt   *time.Time
 }
-

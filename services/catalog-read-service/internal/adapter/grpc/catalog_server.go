@@ -13,7 +13,7 @@ type CatalogServer struct {
 }
 
 func NewCatalogServer(svc port.ProductService) *CatalogServer {
-	return &CatalogServer{svc:svc}
+	return &CatalogServer{svc: svc}
 }
 
 func (c *CatalogServer) GetProducts(ctx context.Context, req *catalogv1.GetProductsRequest) (*catalogv1.GetProductsResponse, error) {

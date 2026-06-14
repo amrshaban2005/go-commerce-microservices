@@ -2,7 +2,7 @@
 set -e
 
 set -a
-source .env
+source deployments/.env.infrastructure
 set +a
 
 ./bin/goose -dir services/catalog-write-service/migrations postgres \
