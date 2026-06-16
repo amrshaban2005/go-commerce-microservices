@@ -7,6 +7,7 @@ require (
 	github.com/amrshaban2005/go-commerce-microservices/pkg v0.0.0-20260613003230-f1fff7f8abff
 	github.com/google/uuid v1.6.0
 	github.com/rabbitmq/amqp091-go v1.11.0
+	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.81.1
 	gorm.io/datatypes v1.2.7
 	gorm.io/driver/postgres v1.6.0
@@ -35,7 +36,7 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.9.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect

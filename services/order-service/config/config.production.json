@@ -2,6 +2,9 @@
   "appOptions": {
     "grpcPort": "6005"
   },
+  "logOptions": {
+    "level": "info"
+  },
   "postgresOptions": {
     "host": "postgres",
     "port": "5432",

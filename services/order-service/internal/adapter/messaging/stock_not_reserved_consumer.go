@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/port"
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.uber.org/zap"
 )
 
 type StockNotReservedEvent struct {
@@ -23,6 +23,7 @@ type StockNotReservedConsumer struct {
 	exchange     string
 	queueName    string
 	orderService port.OrderService
+	logger       *zap.Logger
 }
 
 func NewStockNotReservedConsumer(
@@ -30,12 +31,14 @@ func NewStockNotReservedConsumer(
 	exchange string,
 	queueName string,
 	orderService port.OrderService,
+	logger *zap.Logger,
 ) *StockNotReservedConsumer {
 	return &StockNotReservedConsumer{
 		channel:      channel,
 		exchange:     exchange,
 		queueName:    queueName,
 		orderService: orderService,
+		logger:       logger,
 	}
 }
 
@@ -87,7 +90,7 @@ func (c *StockNotReservedConsumer) Start(ctx context.Context) error {
 		return err
 	}
 
-	slog.Info("stock not reserved consumer started", "queue", queue.Name)
+	c.logger.Info("stock not reserved consumer started", zap.String("queue", queue.Name))
 
 	for {
 		select {
@@ -107,20 +110,20 @@ func (c *StockNotReservedConsumer) handleMessage(ctx context.Context, delivery a
 	var event StockNotReservedEvent
 
 	if err := json.Unmarshal(delivery.Body, &event); err != nil {
-		slog.Error("failed to unmarshal stock not reserved event", "error", err)
+		c.logger.Error("failed to unmarshal stock not reserved event", zap.Error(err))
 		_ = delivery.Nack(false, false)
 		return
 	}
 
 	messageID, err := uuid.Parse(event.MessageID)
 	if err != nil {
-		slog.Error("failed to parse message id", "error", err)
+		c.logger.Error("failed to parse message id", zap.String("message_id", event.MessageID), zap.Error(err))
 		_ = delivery.Nack(false, false)
 		return
 	}
 	orderID, err := uuid.Parse(event.OrderID)
 	if err != nil {
-		slog.Error("failed to parse order id", "error", err)
+		c.logger.Error("failed to parse order id", zap.String("order_id", event.OrderID), zap.Error(err))
 		_ = delivery.Nack(false, false)
 		return
 	}
@@ -132,12 +135,21 @@ func (c *StockNotReservedConsumer) handleMessage(ctx context.Context, delivery a
 		delivery.Body,
 	)
 	if err != nil {
-		slog.Error("failed to handle stock not reserved event", "error", err)
+		c.logger.Error(
+			"failed to handle stock not reserved event",
+			zap.String("message_id", event.MessageID),
+			zap.String("order_id", event.OrderID),
+			zap.Error(err),
+		)
 		_ = delivery.Nack(false, true)
 		return
 	}
 
 	_ = delivery.Ack(false)
 
-	slog.Info("Reserve stock not reserved event consumed", "order_id", event.OrderID)
+	c.logger.Info(
+		"stock not reserved event consumed",
+		zap.String("message_id", event.MessageID),
+		zap.String("order_id", event.OrderID),
+	)
 }

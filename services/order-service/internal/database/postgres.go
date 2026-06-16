@@ -2,14 +2,14 @@ package database
 
 import (
 	"fmt"
-	"log"
 	"time"
 
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func ConnectPostgres(options *PostgresOptions) (*gorm.DB, error) {
+func ConnectPostgres(logger *zap.Logger, options *PostgresOptions) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s TimeZone=UTC",
 		options.Host,
@@ -38,7 +38,7 @@ func ConnectPostgres(options *PostgresOptions) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to ping postgres: %w", err)
 	}
 
-	log.Println("PostgreSQL connected successfully")
+	logger.Info("PostgreSQL connected successfully")
 
 	return db, nil
 }
