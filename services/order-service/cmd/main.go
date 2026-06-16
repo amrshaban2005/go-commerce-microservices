@@ -67,7 +67,7 @@ func main() {
 	}
 
 	//connect postgres
-	db, err := database.ConnectPostgres(logger.With(zap.String("connection", "postgres")),postgresOptions)
+	db, err := database.ConnectPostgres(logger.With(zap.String("connection", "postgres")), postgresOptions)
 	if err != nil {
 		logger.Fatal("failed to connect to postgres", zap.Error(err))
 	}
