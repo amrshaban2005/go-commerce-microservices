@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/port"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -16,11 +17,11 @@ type InboxMessageModel struct {
 	ProcessedAt time.Time `bson:"processed_at"`
 }
 
-type InboxMessageMongoRepository struct {
+type inboxMessageMongoRepository struct {
 	collection *mongo.Collection
 }
 
-func NewInboxMessageMongoRepository(db *mongo.Database) (*InboxMessageMongoRepository, error) {
+func NewInboxMessageMongoRepository(db *mongo.Database) (port.InboxRepository, error) {
 	collection := db.Collection("inbox_messages")
 
 	_, err := collection.Indexes().CreateOne(
@@ -36,12 +37,12 @@ func NewInboxMessageMongoRepository(db *mongo.Database) (*InboxMessageMongoRepos
 		return nil, err
 	}
 
-	return &InboxMessageMongoRepository{
+	return &inboxMessageMongoRepository{
 		collection: collection,
 	}, nil
 }
 
-func (r *InboxMessageMongoRepository) IsProcessed(ctx context.Context, messageID string) (bool, error) {
+func (r *inboxMessageMongoRepository) IsProcessed(ctx context.Context, messageID string) (bool, error) {
 	count, err := r.collection.CountDocuments(ctx, bson.M{"message_id": messageID})
 	if err != nil {
 		return false, err
@@ -50,7 +51,7 @@ func (r *InboxMessageMongoRepository) IsProcessed(ctx context.Context, messageID
 	return count > 0, nil
 }
 
-func (r *InboxMessageMongoRepository) SaveProcessed(
+func (r *inboxMessageMongoRepository) SaveProcessed(
 	ctx context.Context,
 	messageID string,
 	eventType string,

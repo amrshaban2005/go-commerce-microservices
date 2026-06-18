@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/domain"
+	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/port"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -17,17 +18,17 @@ type ProductReadModel struct {
 	Status      string  `bson:"status"`
 }
 
-type ProductRepositoryMongo struct {
+type productRepositoryMongo struct {
 	collection *mongo.Collection
 }
 
-func NewProductRepositoryMongo(db *mongo.Database) *ProductRepositoryMongo {
-	return &ProductRepositoryMongo{
+func NewProductRepositoryMongo(db *mongo.Database) port.ProductRepository {
+	return &productRepositoryMongo{
 		collection: db.Collection("products"),
 	}
 }
 
-func (r *ProductRepositoryMongo) Upsert(ctx context.Context, product domain.Product) error {
+func (r *productRepositoryMongo) Upsert(ctx context.Context, product domain.Product) error {
 	model := ProductReadModel{
 		ID:          product.ID,
 		Name:        product.Name,
@@ -46,7 +47,7 @@ func (r *ProductRepositoryMongo) Upsert(ctx context.Context, product domain.Prod
 	return err
 }
 
-func (r *ProductRepositoryMongo) FindAll(ctx context.Context) ([]domain.Product, error) {
+func (r *productRepositoryMongo) FindAll(ctx context.Context) ([]domain.Product, error) {
 	cursor, err := r.collection.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, err

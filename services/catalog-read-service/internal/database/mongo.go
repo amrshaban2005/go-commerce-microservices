@@ -3,14 +3,14 @@ package database
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.uber.org/zap"
 )
 
-func ConnectMongo(config *MongoOptions) (*mongo.Client, error) {
+func ConnectMongo(logger *zap.Logger, config *MongoOptions) (*mongo.Client, error) {
 
 	client, err := mongo.Connect(options.Client().ApplyURI(config.URI))
 	if err != nil {
@@ -24,7 +24,7 @@ func ConnectMongo(config *MongoOptions) (*mongo.Client, error) {
 		return nil, fmt.Errorf("failed to ping mongo: %w", err)
 	}
 
-	log.Println("mongo connected successfully")
+	logger.Info("mongo connected successfully")
 
 	return client, nil
 }

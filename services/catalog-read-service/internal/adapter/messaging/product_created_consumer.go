@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/domain"
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/port"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.uber.org/zap"
 )
 
 type ProductCreatedEvent struct {
@@ -25,6 +25,7 @@ type ProductCreatedConsumer struct {
 	exchange       string
 	queueName      string
 	productService port.ProductService
+	logger         *zap.Logger
 }
 
 func NewProductCreatedConsumer(
@@ -32,12 +33,14 @@ func NewProductCreatedConsumer(
 	exchange string,
 	queueName string,
 	productService port.ProductService,
+	logger *zap.Logger,
 ) *ProductCreatedConsumer {
 	return &ProductCreatedConsumer{
 		channel:        channel,
 		exchange:       exchange,
 		queueName:      queueName,
 		productService: productService,
+		logger:         logger,
 	}
 }
 
@@ -89,7 +92,7 @@ func (c *ProductCreatedConsumer) Start(ctx context.Context) error {
 		return err
 	}
 
-	slog.Info("product created consumer started", "queue", queue.Name)
+	c.logger.Info("product created consumer started", zap.String("queue", queue.Name))
 
 	for {
 		select {
@@ -109,7 +112,7 @@ func (c *ProductCreatedConsumer) handleMessage(ctx context.Context, delivery amq
 	var event ProductCreatedEvent
 
 	if err := json.Unmarshal(delivery.Body, &event); err != nil {
-		slog.Error("failed to unmarshal ProductCreated event", "error", err)
+		c.logger.Error("failed to unmarshal product created event", zap.Error(err))
 		_ = delivery.Nack(false, false)
 		return
 	}
@@ -129,12 +132,21 @@ func (c *ProductCreatedConsumer) handleMessage(ctx context.Context, delivery amq
 		delivery.Body,
 	)
 	if err != nil {
-		slog.Error("failed to handle ProductCreated event", "error", err)
+		c.logger.Error(
+			"failed to handle product created event",
+			zap.String("message_id", event.MessageID),
+			zap.String("product_id", event.ProductID),
+			zap.Error(err),
+		)
 		_ = delivery.Nack(false, true)
 		return
 	}
 
 	_ = delivery.Ack(false)
 
-	slog.Info("ProductCreated event consumed", "product_id", event.ProductID)
+	c.logger.Info(
+		"product created event consumed",
+		zap.String("message_id", event.MessageID),
+		zap.String("product_id", event.ProductID),
+	)
 }

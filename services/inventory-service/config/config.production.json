@@ -1,4 +1,7 @@
 {
+  "logOptions": {
+    "level": "info"
+  },
   "postgresOptions": {
     "host": "postgres",
     "port": "5432",

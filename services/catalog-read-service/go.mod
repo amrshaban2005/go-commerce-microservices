@@ -4,9 +4,11 @@ go 1.26.3
 
 require (
 	github.com/amrshaban2005/go-commerce-microservices/api/gen/go v0.0.0-20260613003230-f1fff7f8abff
-	github.com/amrshaban2005/go-commerce-microservices/pkg v0.0.0-20260613003230-f1fff7f8abff
+	github.com/amrshaban2005/go-commerce-microservices/pkg v0.0.0-20260617231701-9c0d1c4202ed
 	github.com/rabbitmq/amqp091-go v1.11.0
 	go.mongodb.org/mongo-driver/v2 v2.6.0
+	go.uber.org/fx v1.24.0
+	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.81.1
 )
 
@@ -27,8 +29,8 @@ require (
 	github.com/xdg-go/scram v1.2.0 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.9.0 // indirect
+	go.uber.org/dig v1.19.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect

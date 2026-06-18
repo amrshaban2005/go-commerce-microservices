@@ -2,6 +2,9 @@
   "appOptions": {
     "grpcPort": "6001"
   },
+  "logOptions": {
+    "level": "debug"
+  },
   "mongoOptions": {
     "uri": "",
     "database": "catalog_read_db"

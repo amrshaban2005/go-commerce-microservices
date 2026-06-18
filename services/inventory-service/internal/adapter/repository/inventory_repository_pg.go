@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/domain"
+	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/port"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -52,15 +53,15 @@ func (InboxMessageDataModel) TableName() string {
 	return "inbox_messages"
 }
 
-type InventoryRepositoryPG struct {
+type inventoryRepositoryPG struct {
 	db *gorm.DB
 }
 
-func NewInventoryRepositoryPG(db *gorm.DB) *InventoryRepositoryPG {
-	return &InventoryRepositoryPG{db: db}
+func NewInventoryRepositoryPG(db *gorm.DB) port.InventoryRepository {
+	return &inventoryRepositoryPG{db: db}
 }
 
-func (r *InventoryRepositoryPG) ReserveStockWithInboxAndOutbox(
+func (r *inventoryRepositoryPG) ReserveStockWithInboxAndOutbox(
 	ctx context.Context,
 	messageID uuid.UUID,
 	orderID uuid.UUID,
@@ -100,7 +101,7 @@ func (r *InventoryRepositoryPG) ReserveStockWithInboxAndOutbox(
 	})
 }
 
-func (r *InventoryRepositoryPG) isMessageProcessed(tx *gorm.DB, messageID uuid.UUID) (bool, error) {
+func (r *inventoryRepositoryPG) isMessageProcessed(tx *gorm.DB, messageID uuid.UUID) (bool, error) {
 	var count int64
 
 	err := tx.Model(&InboxMessageDataModel{}).
@@ -110,7 +111,7 @@ func (r *InventoryRepositoryPG) isMessageProcessed(tx *gorm.DB, messageID uuid.U
 	return count > 0, err
 }
 
-func (r *InventoryRepositoryPG) checkAndLockStock(
+func (r *inventoryRepositoryPG) checkAndLockStock(
 	tx *gorm.DB,
 	items []domain.ReserveStockItem,
 ) (bool, string, map[uuid.UUID]InventoryDataModel, error) {
@@ -141,7 +142,7 @@ func (r *InventoryRepositoryPG) checkAndLockStock(
 	return true, "", inventories, nil
 }
 
-func (r *InventoryRepositoryPG) reserveStock(
+func (r *inventoryRepositoryPG) reserveStock(
 	tx *gorm.DB,
 	orderID uuid.UUID,
 	items []domain.ReserveStockItem,
@@ -182,7 +183,7 @@ func (r *InventoryRepositoryPG) reserveStock(
 	return nil
 }
 
-func (r *InventoryRepositoryPG) insertOutbox(
+func (r *inventoryRepositoryPG) insertOutbox(
 	tx *gorm.DB,
 	orderID uuid.UUID,
 	eventType string,
@@ -208,7 +209,7 @@ func (r *InventoryRepositoryPG) insertOutbox(
 	return tx.Create(&outbox).Error
 }
 
-func (r *InventoryRepositoryPG) insertInbox(
+func (r *inventoryRepositoryPG) insertInbox(
 	tx *gorm.DB,
 	messageID uuid.UUID,
 	eventType string,
