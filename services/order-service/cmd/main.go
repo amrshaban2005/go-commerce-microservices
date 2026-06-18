@@ -13,7 +13,7 @@ func main() {
 		log.Println("No local .env file found; using system environment variables")
 	}
 
-	fxApp := fx.New(app.Module())
+	fxApp := fx.New(app.Module(), fx.NopLogger)
 	if err := fxApp.Err(); err != nil {
 		log.Fatalf("failed to build app: %v", err)
 	}

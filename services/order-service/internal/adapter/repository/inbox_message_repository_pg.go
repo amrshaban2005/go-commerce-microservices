@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/port"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -21,16 +22,16 @@ func (InboxMessageDataModel) TableName() string {
 	return "inbox_messages"
 }
 
-type InboxMessageRepositoryPG struct {
+type inboxMessageRepositoryPG struct {
 	db *gorm.DB
 }
 
-func NewInboxMessageRepository(db *gorm.DB) *InboxMessageRepositoryPG {
+func NewInboxMessageRepository(db *gorm.DB) port.InboxRepository {
 
-	return &InboxMessageRepositoryPG{db}
+	return &inboxMessageRepositoryPG{db}
 }
 
-func (r *InboxMessageRepositoryPG) IsProcessed(ctx context.Context, messageID uuid.UUID) (bool, error) {
+func (r *inboxMessageRepositoryPG) IsProcessed(ctx context.Context, messageID uuid.UUID) (bool, error) {
 	var count int64
 
 	err := r.db.WithContext(ctx).Model(&InboxMessageDataModel{}).
@@ -40,7 +41,7 @@ func (r *InboxMessageRepositoryPG) IsProcessed(ctx context.Context, messageID uu
 	return count > 0, err
 }
 
-func (r *InboxMessageRepositoryPG) SaveProcessed(
+func (r *inboxMessageRepositoryPG) SaveProcessed(
 	ctx context.Context,
 	messageID uuid.UUID,
 	eventType string,

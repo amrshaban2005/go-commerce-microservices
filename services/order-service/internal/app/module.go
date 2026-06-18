@@ -271,21 +271,17 @@ func StartConsumers(
 	logger *zap.Logger,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
-	errChan := make(chan error, 1)
 
 	lifecycle.Append(fx.Hook{
 		OnStart: func(startCtx context.Context) error {
 			logger.Info("starting order consumers")
 
 			go func() {
-				errChan <- messaging.Start(startCtx, messaging.Consumers{
+				err := messaging.Start(ctx, messaging.Consumers{
 					StockReserved:    stockReservedConsumer,
 					StockNotReserved: stockNotReservedConsumer,
 				})
-			}()
 
-			go func() {
-				err := <-errChan
 				if err != nil {
 					logger.Error("consumer stopped with error", zap.Error(err))
 					return
@@ -309,12 +305,18 @@ func StartOutboxWorker(
 	outboxWorker *worker.OutboxWorker,
 	logger *zap.Logger,
 ) {
+	ctx, cancel := context.WithCancel(context.Background())
 	lifecycle.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
+		OnStart: func(startCtxctx context.Context) error {
 			logger.Info("starting outbox worker")
 
 			go outboxWorker.Start(ctx)
 
+			return nil
+		},
+		OnStop: func(stopCtx context.Context) error {
+			logger.Info("stopping outbox worker")
+			cancel()
 			return nil
 		},
 	})

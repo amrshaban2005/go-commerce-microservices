@@ -73,6 +73,11 @@ vet:
 		(cd $$module && go vet ./...) || exit 1; \
 	done
 
+dev-check:
+	make fmt
+	make test
+	make vet
+
 dev-start:
 	make dev-up
 	sleep 5
