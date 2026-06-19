@@ -4,24 +4,29 @@ import (
 	"context"
 
 	catalogv1 "github.com/amrshaban2005/go-commerce-microservices/api/gen/go/catalog/v1"
-	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/port"
+	gettingproducts "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/getting_products"
+	"github.com/mehdihadeli/go-mediatr"
 )
 
 type CatalogServer struct {
 	catalogv1.UnimplementedCatalogReadServiceServer
-	svc port.ProductService
 }
 
-func NewCatalogServer(svc port.ProductService) *CatalogServer {
-	return &CatalogServer{svc: svc}
+func NewCatalogServer() *CatalogServer {
+	return &CatalogServer{}
 }
 
 func (c *CatalogServer) GetProducts(ctx context.Context, req *catalogv1.GetProductsRequest) (*catalogv1.GetProductsResponse, error) {
 
-	products, err := c.svc.GetProducts(ctx)
+	result, err := mediatr.Send[*gettingproducts.Query, *gettingproducts.Result](
+		ctx,
+		&gettingproducts.Query{},
+	)
 	if err != nil {
 		return nil, err
 	}
+
+	products := result.Products
 	response := make([]*catalogv1.Product, 0, len(products))
 
 	for _, product := range products {

@@ -11,8 +11,9 @@ import (
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/adapter/messaging"
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/adapter/repository"
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/database"
-	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/port"
-	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/service"
+	gettingproducts "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/getting_products"
+	handlingproductcreated "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/handling_product_created"
+	"github.com/mehdihadeli/go-mediatr"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.uber.org/fx"
@@ -31,7 +32,8 @@ func Module() fx.Option {
 			provideMongoDatabase,
 			repository.NewProductRepositoryMongo,
 			repository.NewInboxMessageMongoRepository,
-			service.NewProductService,
+			gettingproducts.NewHandler,
+			handlingproductcreated.NewHandler,
 			provideRabbitMQConnection,
 			provideRabbitMQChannel,
 			provideProductCreatedConsumer,
@@ -39,6 +41,7 @@ func Module() fx.Option {
 		fx.Invoke(
 			StartConsumer,
 			StartGRPCServer,
+			RegisterMediatorHandlers,
 		),
 	)
 }
@@ -152,14 +155,12 @@ func provideRabbitMQChannel(conn *amqp.Connection, lifecycle fx.Lifecycle) (*amq
 func provideProductCreatedConsumer(
 	channel *amqp.Channel,
 	options *messaging.RabbitMQOptions,
-	productService port.ProductService,
 	logger *zap.Logger,
 ) *messaging.ProductCreatedConsumer {
 	return messaging.NewProductCreatedConsumer(
 		channel,
 		options.Exchange,
 		options.ProductCreatedQueue,
-		productService,
 		logger.With(zap.String("component", "product_created_consumer")),
 	)
 }
@@ -198,11 +199,10 @@ func StartConsumer(
 func StartGRPCServer(
 	lifecycle fx.Lifecycle,
 	appOptions *appconfig.AppOptions,
-	productService port.ProductService,
 	logger *zap.Logger,
 ) {
 	server := grpc.NewServer()
-	catalogv1.RegisterCatalogReadServiceServer(server, grpcadapter.NewCatalogServer(productService))
+	catalogv1.RegisterCatalogReadServiceServer(server, grpcadapter.NewCatalogServer())
 
 	lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -227,4 +227,23 @@ func StartGRPCServer(
 			return nil
 		},
 	})
+}
+
+func RegisterMediatorHandlers(
+	getProductsHandler *gettingproducts.Handler,
+	productCreatedHandler *handlingproductcreated.Handler,
+) error {
+	if err := mediatr.RegisterRequestHandler[*gettingproducts.Query, *gettingproducts.Result](
+		getProductsHandler,
+	); err != nil {
+		return err
+	}
+
+	if err := mediatr.RegisterRequestHandler[*handlingproductcreated.Command, *struct{}](
+		productCreatedHandler,
+	); err != nil {
+		return err
+	}
+
+	return nil
 }

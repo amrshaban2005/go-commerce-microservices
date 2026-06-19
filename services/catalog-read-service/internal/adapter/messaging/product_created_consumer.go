@@ -6,7 +6,8 @@ import (
 	"errors"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/domain"
-	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/port"
+	handlingproductcreated "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/handling_product_created"
+	"github.com/mehdihadeli/go-mediatr"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
@@ -21,26 +22,23 @@ type ProductCreatedEvent struct {
 }
 
 type ProductCreatedConsumer struct {
-	channel        *amqp.Channel
-	exchange       string
-	queueName      string
-	productService port.ProductService
-	logger         *zap.Logger
+	channel   *amqp.Channel
+	exchange  string
+	queueName string
+	logger    *zap.Logger
 }
 
 func NewProductCreatedConsumer(
 	channel *amqp.Channel,
 	exchange string,
 	queueName string,
-	productService port.ProductService,
 	logger *zap.Logger,
 ) *ProductCreatedConsumer {
 	return &ProductCreatedConsumer{
-		channel:        channel,
-		exchange:       exchange,
-		queueName:      queueName,
-		productService: productService,
-		logger:         logger,
+		channel:   channel,
+		exchange:  exchange,
+		queueName: queueName,
+		logger:    logger,
 	}
 }
 
@@ -125,11 +123,13 @@ func (c *ProductCreatedConsumer) handleMessage(ctx context.Context, delivery amq
 		Status:      event.Status,
 	}
 
-	err := c.productService.HandleProductCreated(
+	_, err := mediatr.Send[*handlingproductcreated.Command, *struct{}](
 		ctx,
-		event.MessageID,
-		product,
-		delivery.Body,
+		&handlingproductcreated.Command{
+			MessageID: event.MessageID,
+			Product:   product,
+			Payload:   delivery.Body,
+		},
 	)
 	if err != nil {
 		c.logger.Error(
