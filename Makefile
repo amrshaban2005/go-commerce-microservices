@@ -73,6 +73,9 @@ vet:
 		(cd $$module && go vet ./...) || exit 1; \
 	done
 
+generate-mock:
+	./scripts/generate-mocks.sh
+
 dev-check:
 	make fmt
 	make test

@@ -11,7 +11,3 @@ type ProductRepository interface {
 	FindAll(ctx context.Context) ([]domain.Product, error)
 }
 
-type ProductService interface {
-	HandleProductCreated(ctx context.Context, messageID string, product domain.Product, payload []byte) error
-	GetProducts(ctx context.Context) ([]domain.Product, error)
-}
