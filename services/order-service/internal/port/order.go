@@ -16,7 +16,7 @@ type OrderRespository interface {
 }
 
 type OrderService interface {
-	CreateOrder(ctx context.Context, customerID uuid.UUID, itemsInput []dto.CreateOrderItemInput) (*domain.Order, error)
+	CreateOrder(ctx context.Context, orderInput dto.CreateOrderInput) (*domain.Order, error)
 	HandleConfirmOrder(ctx context.Context, orderID uuid.UUID, messageID uuid.UUID, payload []byte) error
 	HandleRejectOrder(ctx context.Context, orderID uuid.UUID, messageID uuid.UUID, payload []byte) error
 	GetOrder(ctx context.Context, orderID uuid.UUID) (*domain.Order, error)

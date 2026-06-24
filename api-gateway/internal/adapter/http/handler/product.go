@@ -34,6 +34,12 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"invalid request body": err.Error()})
 		return
 	}
+
+	if err := req.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	product, err := h.writeCatalogClient.CreateProducts(c.Request.Context(), req.Name, req.Description, req.Price)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"failed to create products": err.Error()})

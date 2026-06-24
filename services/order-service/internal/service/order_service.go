@@ -20,11 +20,15 @@ func NewOrderService(orderRepo port.OrderRespository, inboxRepo port.InboxReposi
 	return &orderService{orderRepo, inboxRepo}
 }
 
-func (s *orderService) CreateOrder(ctx context.Context, customerID uuid.UUID, itemsInput []dto.CreateOrderItemInput) (*domain.Order, error) {
+func (s *orderService) CreateOrder(ctx context.Context, orderInput dto.CreateOrderInput) (*domain.Order, error) {
 
-	orderItems := make([]domain.OrderItems, 0, len(itemsInput))
+	if err := orderInput.Validate(); err != nil {
+		return nil, err
+	}
 
-	for _, item := range itemsInput {
+	orderItems := make([]domain.OrderItems, 0, len(orderInput.Items))
+
+	for _, item := range orderInput.Items {
 		orderItems = append(orderItems, domain.OrderItems{
 			ProductID:   item.ProductID,
 			ProductName: item.ProductName,
@@ -32,7 +36,7 @@ func (s *orderService) CreateOrder(ctx context.Context, customerID uuid.UUID, it
 			Quantity:    item.Quantity,
 		})
 	}
-	order, err := domain.NewOrder(customerID, orderItems)
+	order, err := domain.NewOrder(orderInput.CustomerID, orderItems)
 	if err != nil {
 		return nil, err
 	}

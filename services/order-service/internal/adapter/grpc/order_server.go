@@ -27,9 +27,6 @@ func (s *OrderServer) CreateOrder(ctx context.Context, in *orderv1.CreateOrderRe
 		return nil, status.Error(codes.InvalidArgument, "invalid customer_id")
 	}
 
-	if len(in.Items) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "order must have at least one item")
-	}
 	itemsInput := make([]dto.CreateOrderItemInput, 0, len(in.Items))
 
 	for _, item := range in.Items {
@@ -44,7 +41,11 @@ func (s *OrderServer) CreateOrder(ctx context.Context, in *orderv1.CreateOrderRe
 			Quantity:    int(item.Quantity),
 		})
 	}
-	order, err := s.svc.CreateOrder(ctx, customerID, itemsInput)
+	order, err := s.svc.CreateOrder(ctx, dto.CreateOrderInput{
+		CustomerID: customerID,
+		Items:      itemsInput,
+	})
+
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

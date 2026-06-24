@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,12 +10,6 @@ const (
 	OrderStatusPending   = "PENDING"
 	OrderStatusConfirmed = "CONFIRMED"
 	OrderStatusFailed    = "FAILED"
-)
-
-var (
-	ErrOrderItemsRequired = errors.New("order must have at least one item")
-	ErrInvalidQuantity    = errors.New("order item quantity must be greater than zero")
-	ErrInvalidUnitPrice   = errors.New("order item unit price must be greater than or equal to zero")
 )
 
 type Order struct {
@@ -40,9 +33,6 @@ type OrderItems struct {
 }
 
 func NewOrder(customerID uuid.UUID, items []OrderItems) (*Order, error) {
-	if len(items) == 0 {
-		return nil, ErrOrderItemsRequired
-	}
 
 	orderID := uuid.New()
 	now := time.Now().UTC()
@@ -50,13 +40,6 @@ func NewOrder(customerID uuid.UUID, items []OrderItems) (*Order, error) {
 	var total float64
 
 	for i := range items {
-		if items[i].Quantity <= 0 {
-			return nil, ErrInvalidQuantity
-		}
-
-		if items[i].UnitPrice < 0 {
-			return nil, ErrInvalidUnitPrice
-		}
 
 		items[i].ID = uuid.New()
 		items[i].OrderID = orderID

@@ -5,6 +5,7 @@ go 1.26.3
 require (
 	github.com/amrshaban2005/go-commerce-microservices/api/gen/go v0.0.0-20260613003230-f1fff7f8abff
 	github.com/amrshaban2005/go-commerce-microservices/pkg v0.0.0-20260616194752-b4b0da4099a3
+	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/google/uuid v1.6.0
 	github.com/rabbitmq/amqp091-go v1.11.0
 	go.uber.org/fx v1.24.0
