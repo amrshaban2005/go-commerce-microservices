@@ -56,7 +56,16 @@ func (s *OrderServer) CreateOrder(ctx context.Context, in *orderv1.CreateOrderRe
 }
 
 func (s *OrderServer) GetOrder(ctx context.Context, in *orderv1.GetOrderRequest) (*orderv1.GetOrderResponse, error) {
-	return nil, nil
+	orderID, err := uuid.Parse(in.OrderId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid order_id")
+	}
+	order, err := s.svc.GetOrder(ctx, orderID)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
+
+	return &orderv1.GetOrderResponse{Order: toProtoOrder(order)}, nil
 }
 
 func toProtoOrder(order *domain.Order) *orderv1.Order {

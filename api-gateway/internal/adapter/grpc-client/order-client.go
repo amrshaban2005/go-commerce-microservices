@@ -32,3 +32,11 @@ func (c OrderClient) CreateOrder(ctx context.Context, req *dto.CreateOrderReques
 	return response.Order, nil
 
 }
+
+func (c OrderClient) GetOrder(ctx context.Context, orderID string) (*orderv1.Order, error) {
+	response, err := c.client.GetOrder(ctx, &orderv1.GetOrderRequest{OrderId: orderID})
+	if err != nil {
+		return nil, err
+	}
+	return response.Order, nil
+}

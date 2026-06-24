@@ -10,4 +10,3 @@ type ProductRepository interface {
 	Upsert(ctx context.Context, product domain.Product) error
 	FindAll(ctx context.Context) ([]domain.Product, error)
 }
-

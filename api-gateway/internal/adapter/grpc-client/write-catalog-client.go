@@ -34,5 +34,4 @@ func (c WriteCatalogClient) CreateProducts(ctx context.Context, name string,
 		return nil, err
 	}
 	return response.Product, nil
-
 }

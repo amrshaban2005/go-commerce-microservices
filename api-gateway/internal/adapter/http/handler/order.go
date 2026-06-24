@@ -26,8 +26,17 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	}
 	order, err := h.orderClient.CreateOrder(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"failed to create products": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"failed to create order": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, dto.FromOrderResponse(order))
+}
+
+func (h *OrderHandler) GetOrder(c *gin.Context) {
+	order, err := h.orderClient.GetOrder(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"failed to get order": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, dto.FromOrderResponse(order))
 }

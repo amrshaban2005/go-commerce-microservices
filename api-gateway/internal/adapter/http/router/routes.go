@@ -16,7 +16,7 @@ func RegisterProductRoutes(rg *gin.RouterGroup, h *handler.ProductHandler) {
 func RegisterOrderRoutes(rg *gin.RouterGroup, h *handler.OrderHandler) {
 	orders := rg.Group("/orders")
 	{
-		//orders.GET("", h.GetProducts)
+		orders.GET("/:id", h.GetOrder)
 		orders.POST("", h.CreateOrder)
 	}
 }

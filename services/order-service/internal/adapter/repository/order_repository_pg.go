@@ -15,12 +15,13 @@ type orderRepositoryPG struct {
 }
 
 type OrderDataModel struct {
-	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	CustomerID  uuid.UUID `gorm:"ype:uuid;column:customer_id"`
-	Status      string    `gorm:"column:status"`
-	TotalAmount float64   `gorm:"column:total_amount"`
-	CreatedAt   time.Time `gorm:"column:created_at"`
-	UpdatedAt   time.Time `gorm:"column:updated_at"`
+	ID          uuid.UUID            `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	CustomerID  uuid.UUID            `gorm:"ype:uuid;column:customer_id"`
+	Status      string               `gorm:"column:status"`
+	TotalAmount float64              `gorm:"column:total_amount"`
+	CreatedAt   time.Time            `gorm:"column:created_at"`
+	UpdatedAt   time.Time            `gorm:"column:updated_at"`
+	Items       []OrderItemDataModel `gorm:"foreignKey:OrderID;references:ID"`
 }
 
 func (OrderDataModel) TableName() string {
@@ -105,6 +106,18 @@ func (r orderRepositoryPG) RejectOrder(ctx context.Context, orderID uuid.UUID) e
 		Error
 }
 
+func (r orderRepositoryPG) GetOrder(ctx context.Context, orderID uuid.UUID) (*domain.Order, error) {
+	var orderModel OrderDataModel
+
+	err := r.db.WithContext(ctx).Preload("Items").
+		Where("id = ? ", orderID).First(&orderModel).Error
+
+	if err != nil {
+		return nil, err
+	}
+	return toDomainOrder(orderModel, orderModel.Items), nil
+}
+
 func toOrderDataModel(order *domain.Order) OrderDataModel {
 	return OrderDataModel{
 		ID:          order.ID,
@@ -132,4 +145,34 @@ func toOrderItemDataModels(items []domain.OrderItems) []OrderItemDataModel {
 	}
 
 	return models
+}
+
+func toDomainOrder(orderModel OrderDataModel, itemModels []OrderItemDataModel) *domain.Order {
+	return &domain.Order{
+		ID:          orderModel.ID,
+		CustomerID:  orderModel.CustomerID,
+		Status:      orderModel.Status,
+		TotalAmount: orderModel.TotalAmount,
+		Items:       toDomainOrderItems(itemModels),
+		CreatedAt:   orderModel.CreatedAt,
+		UpdatedAt:   orderModel.UpdatedAt,
+	}
+}
+
+func toDomainOrderItems(itemModels []OrderItemDataModel) []domain.OrderItems {
+	items := make([]domain.OrderItems, 0, len(itemModels))
+
+	for _, item := range itemModels {
+		items = append(items, domain.OrderItems{
+			ID:          item.ID,
+			OrderID:     item.OrderID,
+			ProductID:   item.ProductID,
+			ProductName: item.ProductName,
+			UnitPrice:   item.UnitPrice,
+			Quantity:    item.Quantity,
+			Subtotal:    item.Subtotal,
+		})
+	}
+
+	return items
 }

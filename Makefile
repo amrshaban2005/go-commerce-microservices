@@ -64,8 +64,11 @@ fmt:
 test:
 	@for module in $(MODULES); do \
 		echo "Testing $$module"; \
-		(cd $$module && go test ./...) || exit 1; \
+		(cd $$module && gotestsum ./... -count=1 -v) || exit 1; \
 	done
+
+test-e2e:
+	cd services/test/e2e && gotestsum ./... -count=1 -v
 
 vet:
 	@for module in $(MODULES); do \
