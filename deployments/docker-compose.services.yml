@@ -39,13 +39,14 @@ services:
     networks:
       - ecommerce-network
     restart: unless-stopped
-  
+
   catalog-read-service:
     image: catalog-read-service:local
     environment:
       APP_ENV: production
       MONGO_URI: ${MONGO_URI}
       RABBITMQ_URL: ${RABBITMQ_URL}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     ports:
       - "6001:6001"
     networks:
@@ -61,7 +62,6 @@ services:
     networks:
       - ecommerce-network
     restart: unless-stopped
-
 
 networks:
   ecommerce-network:

@@ -2,49 +2,30 @@
 
 `Go Commerce Microservices` is a learning-focused ecommerce backend built with Go and a small set of practical microservices patterns: gRPC service communication, REST API gateway, event-driven messaging with RabbitMQ, Saga workflow, Postgres write models, MongoDB read models, Outbox/Inbox patterns, dependency injection with Uber Fx, structured logging with Zap, and configuration with Viper.
 
-## Technologies
-
-- Go
-- gRPC
-- Gin
-- RabbitMQ
-- Postgres
-- MongoDB
-- GORM
-- Uber Fx
-- Zap
-- Viper
-- godotenv
-- go-mediatr
-- go-ozzo/ozzo-validation
-- go-playground/validator
-- Testcontainers
-- Docker Compose
-- GitHub Actions
-
 ## Features
 
+- Using `Go` with a multi-module workspace.
 - Using `Microservices Architecture` with separate services for catalog, orders, inventory, and API gateway.
-- Using `Hexagonal Architecture` style inside services with `domain`, `port`, `service`, and `adapter` packages.
+- Using `Hexagonal Architecture` style inside services with application core, ports, and adapters.
 - Using `gRPC` for internal service APIs.
-- Using a REST `API Gateway` with Gin.
-- Using `Event Driven Architecture` with RabbitMQ.
+- Using a REST `API Gateway` built with `Gin`.
+- Using `Event Driven Architecture` with `RabbitMQ`.
 - Using the `Outbox Pattern` for reliable message publishing from write-side services.
 - Using the `Inbox Pattern` for idempotent message consumption.
 - Using the `Saga Pattern` for the order and stock reservation workflow.
 - Using `CQRS` between catalog write and catalog read services.
 - Using `Mediator Pattern` in catalog read service with `go-mediatr`.
-- Using `Postgres` for write-side services.
+- Using `Postgres` for write-side services and transactional data.
 - Using `MongoDB` for catalog read projections.
 - Using `GORM` for Postgres persistence.
 - Using `Uber Fx` for dependency injection and application lifecycle.
 - Using `Zap` for structured logging.
-- Using `Viper` and `.env` files for configuration.
+- Using `Viper` and `godotenv` for configuration and local environment loading.
 - Using `go-ozzo/ozzo-validation` for application input validation.
 - Using `go-playground/validator` for transport/request validation where needed.
-- Using Docker and Docker Compose for local infrastructure and service deployment.
-- Using unit tests, integration tests, and E2E tests for selected flows.
-- Using GitHub Actions CI for formatting, vet, tests, and build.
+- Using `Docker` and `Docker Compose` for local infrastructure and service deployment.
+- Using `Testcontainers`, unit tests, integration tests, and E2E tests for selected flows.
+- Using `GitHub Actions` CI for formatting, vet, tests, and build.
 
 ## Services
 
@@ -146,41 +127,7 @@ This service exists in the repository structure, but it is not part of the main 
 
 ## System Architecture
 
-```mermaid
-flowchart LR
-    Client["Client / Browser"]
-    Gateway["API Gateway<br/>Gin HTTP API"]
-
-    CatalogWrite["Catalog Write Service<br/>gRPC + Postgres"]
-    CatalogRead["Catalog Read Service<br/>gRPC + MongoDB"]
-    Order["Order Service<br/>gRPC + Postgres"]
-    Inventory["Inventory Service<br/>RabbitMQ Consumer + Postgres"]
-
-    CatalogWriteDB[("Catalog Write DB<br/>Postgres")]
-    OrderDB[("Order DB<br/>Postgres")]
-    InventoryDB[("Inventory DB<br/>Postgres")]
-    CatalogReadDB[("Catalog Read DB<br/>MongoDB")]
-
-    Rabbit["RabbitMQ<br/>Message Broker"]
-
-    Client --> Gateway
-    Gateway -->|"HTTP -> gRPC"| CatalogWrite
-    Gateway -->|"HTTP -> gRPC"| CatalogRead
-    Gateway -->|"HTTP -> gRPC"| Order
-
-    CatalogWrite --> CatalogWriteDB
-    Order --> OrderDB
-    Inventory --> InventoryDB
-    CatalogRead --> CatalogReadDB
-
-    CatalogWrite -->|"ProductCreated / ProductUpdated / ProductDeleted"| Rabbit
-    Order -->|"ReserveStockRequested"| Rabbit
-    Inventory -->|"StockReserved / StockReservationFailed"| Rabbit
-
-    Rabbit --> CatalogRead
-    Rabbit --> Inventory
-    Rabbit --> Order
-```
+![System Architecture](./assets/system-architecture-diagram.svg)
 
 The project uses synchronous communication for request/response APIs and asynchronous messaging for cross-service workflows.
 
@@ -193,35 +140,7 @@ The project uses synchronous communication for request/response APIs and asynchr
 
 Most services use a hexagonal architecture style. The application core owns the domain rules and ports, while adapters handle gRPC, RabbitMQ, and database details.
 
-```mermaid
-flowchart TB
-    External["External world<br/>gRPC / RabbitMQ / Database"]
-
-    subgraph Adapter["adapter"]
-        GRPC["gRPC adapter"]
-        Messaging["Messaging adapter"]
-        Repository["Repository adapter"]
-    end
-
-    subgraph Core["core"]
-        Port["port interfaces"]
-        Service["application service"]
-        Domain["domain model"]
-    end
-
-    DB[("Database")]
-    Broker["RabbitMQ"]
-
-    GRPC --> Service
-    Messaging --> Service
-    Service --> Domain
-    Service --> Port
-    Port --> Repository
-    Repository --> DB
-    Messaging --> Broker
-    External --> GRPC
-    External --> Messaging
-```
+![Code Architecture](./assets/code-architecture-diagram.svg)
 
 Catalog read service also practices a feature-based CQRS/Mediator shape. That flow is:
 
@@ -233,23 +152,7 @@ adapter -> query/command -> mediator -> handler -> repository port -> repository
 
 The order workflow uses an event-driven Saga. There is no single distributed database transaction across order and inventory services. Instead, each service commits its own local transaction and publishes the next event.
 
-```mermaid
-flowchart LR
-    CreateOrder["Create Order<br/>Order Service"]
-    ReserveRequest["ReserveStockRequested<br/>event"]
-    ReserveStock["Reserve Stock<br/>Inventory Service"]
-    StockReserved["StockReserved<br/>event"]
-    StockFailed["StockReservationFailed<br/>event"]
-    ConfirmOrder["Confirm Order<br/>Order Service"]
-    RejectOrder["Reject Order<br/>Order Service"]
-
-    CreateOrder --> ReserveRequest
-    ReserveRequest --> ReserveStock
-    ReserveStock -->|"success"| StockReserved
-    ReserveStock -->|"failure"| StockFailed
-    StockReserved --> ConfirmOrder
-    StockFailed --> RejectOrder
-```
+![Saga Pattern](./assets/saga-pattern-diagram.svg)
 
 Current saga steps:
 
@@ -266,68 +169,11 @@ This is a choreography-based Saga because services react to events directly. The
 
 ### Catalog Product Flow
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Client
-    participant Gateway as API Gateway
-    participant Write as Catalog Write Service
-    participant WriteDB as Postgres
-    participant Rabbit as RabbitMQ
-    participant Read as Catalog Read Service
-    participant Mongo as MongoDB
-
-    Client->>Gateway: Create product
-    Gateway->>Write: gRPC CreateProduct
-    Write->>WriteDB: Save product + outbox message
-    Write-->>Gateway: Product created
-    Gateway-->>Client: HTTP response
-
-    Write->>WriteDB: Outbox worker reads pending event
-    Write->>Rabbit: Publish ProductCreated
-    Rabbit->>Read: Consume ProductCreated
-    Read->>Mongo: Upsert product projection
-
-    Client->>Gateway: Get products
-    Gateway->>Read: gRPC GetProducts
-    Read->>Mongo: Query products
-    Read-->>Gateway: Products
-    Gateway-->>Client: HTTP response
-```
+![Catalog Product Flow](./assets/catalog-product-flow-diagram.svg)
 
 ### Order Flow
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Client
-    participant Order as Order Service
-    participant OrderDB as Order Postgres
-    participant Rabbit as RabbitMQ
-    participant Inventory as Inventory Service
-    participant InventoryDB as Inventory Postgres
-
-    Client->>Order: gRPC CreateOrder
-    Order->>OrderDB: Save order + ReserveStockRequested outbox
-    Order-->>Client: Order PENDING
-
-    Order->>OrderDB: Outbox worker reads pending event
-    Order->>Rabbit: Publish ReserveStockRequested
-    Rabbit->>Inventory: Consume ReserveStockRequested
-
-    Inventory->>InventoryDB: Lock stock rows with SELECT FOR UPDATE
-    alt stock available
-        Inventory->>InventoryDB: Reserve stock + StockReserved outbox
-        Inventory->>Rabbit: Publish StockReserved
-        Rabbit->>Order: Consume StockReserved
-        Order->>OrderDB: Mark order CONFIRMED
-    else stock not available
-        Inventory->>InventoryDB: Save StockReservationFailed outbox
-        Inventory->>Rabbit: Publish StockReservationFailed
-        Rabbit->>Order: Consume StockReservationFailed
-        Order->>OrderDB: Mark order FAILED
-    end
-```
+![Order Flow](./assets/order-flow-diagram.svg)
 
 ## Shared Packages
 

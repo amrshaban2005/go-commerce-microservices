@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
+  <title id="title">Order Flow</title>
+  <desc id="desc">Colored sequence-style diagram for creating an order, publishing ReserveStockRequested, reserving inventory, and confirming or failing the order.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#19324d" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#f97316"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#16a34a"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#dc2626"/>
+    </marker>
+    <style>
+      .title { font: 700 30px Inter, Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 15px Inter, Arial, sans-serif; fill: #475569; }
+      .label { font: 700 15px Inter, Arial, sans-serif; fill: #0f172a; }
+      .step { font: 600 13px Inter, Arial, sans-serif; fill: #334155; }
+      .lane { stroke: #cbd5e1; stroke-width: 2; stroke-dasharray: 7 7; }
+      .box { filter: url(#shadow); stroke-width: 2; }
+      .blue { fill: none; stroke: #2563eb; stroke-width: 3; marker-end: url(#arrow-blue); }
+      .orange { fill: none; stroke: #f97316; stroke-width: 3; marker-end: url(#arrow-orange); }
+      .green { fill: none; stroke: #16a34a; stroke-width: 3; marker-end: url(#arrow-green); }
+      .red { fill: none; stroke: #dc2626; stroke-width: 3; marker-end: url(#arrow-red); }
+    </style>
+  </defs>
+
+  <rect width="1400" height="820" fill="#f8fbff"/>
+  <text x="700" y="52" text-anchor="middle" class="title">Order Flow</text>
+  <text x="700" y="80" text-anchor="middle" class="subtitle">Order service starts the saga, inventory reserves stock, and order is confirmed or failed from the result event.</text>
+
+  <rect x="55" y="120" width="1290" height="640" rx="28" fill="#ffffff" stroke="#dbeafe" stroke-width="2"/>
+
+  <rect x="95" y="145" width="150" height="58" rx="14" fill="#dbeafe" stroke="#60a5fa" class="box"/>
+  <text x="170" y="181" text-anchor="middle" class="label">Client</text>
+  <line x1="170" y1="215" x2="170" y2="720" class="lane"/>
+
+  <rect x="310" y="145" width="170" height="58" rx="14" fill="#fef3c7" stroke="#f59e0b" class="box"/>
+  <text x="395" y="181" text-anchor="middle" class="label">Order Service</text>
+  <line x1="395" y1="215" x2="395" y2="720" class="lane"/>
+
+  <rect x="535" y="145" width="165" height="58" rx="14" fill="#fffbeb" stroke="#f59e0b" class="box"/>
+  <text x="617" y="181" text-anchor="middle" class="label">Order DB</text>
+  <line x1="617" y1="215" x2="617" y2="720" class="lane"/>
+
+  <rect x="755" y="145" width="155" height="58" rx="14" fill="#fff7ed" stroke="#f97316" class="box"/>
+  <text x="832" y="181" text-anchor="middle" class="label">RabbitMQ</text>
+  <line x1="832" y1="215" x2="832" y2="720" class="lane"/>
+
+  <rect x="965" y="145" width="180" height="58" rx="14" fill="#fee2e2" stroke="#ef4444" class="box"/>
+  <text x="1055" y="181" text-anchor="middle" class="label">Inventory Service</text>
+  <line x1="1055" y1="215" x2="1055" y2="720" class="lane"/>
+
+  <rect x="1190" y="145" width="155" height="58" rx="14" fill="#fef2f2" stroke="#ef4444" class="box"/>
+  <text x="1267" y="181" text-anchor="middle" class="label">Inventory DB</text>
+  <line x1="1267" y1="215" x2="1267" y2="720" class="lane"/>
+
+  <path d="M170 245 L395 245" class="blue"/>
+  <text x="195" y="236" class="step">1. gRPC CreateOrder</text>
+  <path d="M395 285 L617 285" class="blue"/>
+  <text x="420" y="276" class="step">2. Save order + outbox</text>
+  <path d="M617 325 L395 325" class="blue"/>
+  <text x="420" y="316" class="step">3. Order PENDING</text>
+  <path d="M395 365 L170 365" class="blue"/>
+
+  <path d="M395 430 L617 430" class="orange"/>
+  <text x="420" y="421" class="step">4. Outbox worker reads event</text>
+  <path d="M617 470 L832 470" class="orange"/>
+  <text x="640" y="461" class="step">5. Publish ReserveStockRequested</text>
+  <path d="M832 510 L1055 510" class="orange"/>
+  <text x="858" y="501" class="step">6. Consume request</text>
+  <path d="M1055 550 L1267 550" class="orange"/>
+  <text x="1080" y="541" class="step">7. Lock rows and reserve stock</text>
+
+  <path d="M1267 600 L1055 600" class="green"/>
+  <text x="1080" y="591" class="step">8a. StockReserved outbox</text>
+  <path d="M1055 635 L832 635" class="green"/>
+  <text x="875" y="626" class="step">9a. Publish StockReserved</text>
+  <path d="M832 670 L395 670" class="green"/>
+  <text x="520" y="661" class="step">10a. Confirm order</text>
+
+  <path d="M1267 640 C1210 705, 1090 715, 1055 680" class="red"/>
+  <text x="1110" y="716" class="step">8b. StockReservationFailed</text>
+  <path d="M1055 700 C965 735, 900 730, 832 700" class="red"/>
+  <path d="M832 720 C680 745, 520 735, 395 705" class="red"/>
+  <text x="520" y="733" class="step">10b. Reject order</text>
+</svg>

@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="920" viewBox="0 0 1500 920" role="img" aria-labelledby="title desc">
+  <title id="title">Go Commerce Microservices System Architecture</title>
+  <desc id="desc">Colored system architecture diagram showing client, API Gateway, services, databases, and RabbitMQ with separated gRPC, database, and event arrows.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fbff"/>
+      <stop offset="100%" stop-color="#eef5ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#19324d" flood-opacity="0.15"/>
+    </filter>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#f97316"/>
+    </marker>
+    <marker id="arrow-slate" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#64748b"/>
+    </marker>
+    <style>
+      .title { font: 700 34px Inter, Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 16px Inter, Arial, sans-serif; fill: #475569; }
+      .section { font: 700 13px Inter, Arial, sans-serif; fill: #334155; letter-spacing: 1.6px; }
+      .label { font: 700 18px Inter, Arial, sans-serif; fill: #0f172a; }
+      .small { font: 500 13px Inter, Arial, sans-serif; fill: #475569; }
+      .tiny { font: 600 12px Inter, Arial, sans-serif; fill: #64748b; }
+      .box { stroke-width: 2; filter: url(#shadow); }
+      .lane { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1.5; }
+      .grpc { fill: none; stroke: #2563eb; stroke-width: 3; marker-end: url(#arrow-blue); }
+      .event { fill: none; stroke: #f97316; stroke-width: 3; marker-end: url(#arrow-orange); }
+      .data { fill: none; stroke: #64748b; stroke-width: 2.6; stroke-dasharray: 8 7; marker-end: url(#arrow-slate); }
+    </style>
+  </defs>
+
+  <rect width="1500" height="920" fill="url(#bg)"/>
+
+  <text x="750" y="58" text-anchor="middle" class="title">Go Commerce Microservices</text>
+  <text x="750" y="88" text-anchor="middle" class="subtitle">Clear separation of synchronous gRPC calls, local database transactions, and asynchronous RabbitMQ events</text>
+
+  <rect x="60" y="125" width="1380" height="710" rx="28" fill="#ffffff" stroke="#dbeafe" stroke-width="2"/>
+
+  <rect x="95" y="170" width="1310" height="160" rx="22" class="lane"/>
+  <text x="120" y="202" class="section">SYNCHRONOUS REQUEST PATH</text>
+
+  <rect x="95" y="360" width="1310" height="245" rx="22" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="120" y="392" class="section">SERVICES AND LOCAL DATA</text>
+
+  <rect x="95" y="635" width="1310" height="150" rx="22" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+  <text x="120" y="667" class="section">ASYNCHRONOUS EVENT PATH</text>
+
+  <rect x="130" y="225" width="180" height="78" rx="18" fill="#dbeafe" stroke="#60a5fa" class="box"/>
+  <text x="220" y="258" text-anchor="middle" class="label">Client</text>
+  <text x="220" y="282" text-anchor="middle" class="small">Browser / API caller</text>
+
+  <rect x="390" y="210" width="220" height="108" rx="20" fill="#ede9fe" stroke="#8b5cf6" class="box"/>
+  <text x="500" y="250" text-anchor="middle" class="label">API Gateway</text>
+  <text x="500" y="276" text-anchor="middle" class="small">Gin HTTP API</text>
+  <text x="500" y="298" text-anchor="middle" class="tiny">maps HTTP to gRPC</text>
+
+  <rect x="710" y="155" width="210" height="86" rx="18" fill="#dcfce7" stroke="#22c55e" class="box"/>
+  <text x="815" y="190" text-anchor="middle" class="label">Catalog Write</text>
+  <text x="815" y="214" text-anchor="middle" class="small">gRPC command API</text>
+
+  <rect x="710" y="260" width="210" height="86" rx="18" fill="#e0f2fe" stroke="#0ea5e9" class="box"/>
+  <text x="815" y="295" text-anchor="middle" class="label">Catalog Read</text>
+  <text x="815" y="319" text-anchor="middle" class="small">gRPC query API</text>
+
+  <rect x="1010" y="210" width="210" height="108" rx="20" fill="#fef3c7" stroke="#f59e0b" class="box"/>
+  <text x="1115" y="250" text-anchor="middle" class="label">Order Service</text>
+  <text x="1115" y="276" text-anchor="middle" class="small">gRPC order API</text>
+  <text x="1115" y="298" text-anchor="middle" class="tiny">starts order saga</text>
+
+  <rect x="245" y="435" width="230" height="92" rx="18" fill="#dcfce7" stroke="#22c55e" class="box"/>
+  <text x="360" y="472" text-anchor="middle" class="label">Catalog Write</text>
+  <text x="360" y="498" text-anchor="middle" class="small">products write side</text>
+
+  <rect x="520" y="435" width="230" height="92" rx="18" fill="#e0f2fe" stroke="#0ea5e9" class="box"/>
+  <text x="635" y="472" text-anchor="middle" class="label">Catalog Read</text>
+  <text x="635" y="498" text-anchor="middle" class="small">read projection</text>
+
+  <rect x="795" y="435" width="230" height="92" rx="18" fill="#fef3c7" stroke="#f59e0b" class="box"/>
+  <text x="910" y="472" text-anchor="middle" class="label">Order Service</text>
+  <text x="910" y="498" text-anchor="middle" class="small">orders + outbox</text>
+
+  <rect x="1070" y="435" width="230" height="92" rx="18" fill="#fee2e2" stroke="#ef4444" class="box"/>
+  <text x="1185" y="472" text-anchor="middle" class="label">Inventory Service</text>
+  <text x="1185" y="498" text-anchor="middle" class="small">stock reservation</text>
+
+  <rect x="245" y="550" width="230" height="45" rx="14" fill="#ecfdf5" stroke="#10b981"/>
+  <text x="360" y="578" text-anchor="middle" class="small">Postgres catalog_write_db</text>
+
+  <rect x="520" y="550" width="230" height="45" rx="14" fill="#eff6ff" stroke="#3b82f6"/>
+  <text x="635" y="578" text-anchor="middle" class="small">MongoDB catalog_read_db</text>
+
+  <rect x="795" y="550" width="230" height="45" rx="14" fill="#fffbeb" stroke="#f59e0b"/>
+  <text x="910" y="578" text-anchor="middle" class="small">Postgres order_db</text>
+
+  <rect x="1070" y="550" width="230" height="45" rx="14" fill="#fef2f2" stroke="#ef4444"/>
+  <text x="1185" y="578" text-anchor="middle" class="small">Postgres inventory_db</text>
+
+  <rect x="560" y="685" width="380" height="78" rx="22" fill="#fff7ed" stroke="#f97316" class="box"/>
+  <text x="750" y="718" text-anchor="middle" class="label">RabbitMQ</text>
+  <text x="750" y="744" text-anchor="middle" class="small">integration events between services</text>
+
+  <path d="M310 264 L390 264" class="grpc"/>
+  <path d="M610 238 C650 198, 670 198, 710 198" class="grpc"/>
+  <path d="M610 278 C650 302, 670 302, 710 302" class="grpc"/>
+  <path d="M610 264 L1010 264" class="grpc"/>
+
+  <path d="M360 527 L360 550" class="data"/>
+  <path d="M635 527 L635 550" class="data"/>
+  <path d="M910 527 L910 550" class="data"/>
+  <path d="M1185 527 L1185 550" class="data"/>
+
+  <path d="M360 527 C360 650, 500 690, 560 710" class="event"/>
+  <path d="M910 527 C910 650, 845 680, 790 685" class="event"/>
+  <path d="M1185 527 C1185 675, 1010 715, 940 724" class="event"/>
+
+  <path d="M680 685 C610 620, 625 560, 635 527" class="event"/>
+  <path d="M830 685 C965 630, 1095 565, 1185 527" class="event"/>
+  <path d="M870 685 C925 620, 920 560, 910 527" class="event"/>
+
+  <text x="625" y="185" class="tiny" fill="#2563eb">gRPC</text>
+  <text x="1260" y="535" class="tiny" fill="#64748b">local transactions</text>
+  <text x="970" y="690" class="tiny" fill="#f97316">events</text>
+
+  <rect x="120" y="690" width="330" height="72" rx="18" fill="#ffffff" stroke="#fed7aa"/>
+  <text x="145" y="720" class="small">Event examples:</text>
+  <text x="145" y="744" class="tiny">ProductCreated, ReserveStockRequested, StockReserved</text>
+
+  <rect x="1045" y="690" width="320" height="72" rx="18" fill="#ffffff" stroke="#fed7aa"/>
+  <text x="1070" y="720" class="small">Patterns:</text>
+  <text x="1070" y="744" class="tiny">Saga, Outbox, Inbox, CQRS, Hexagonal Architecture</text>
+</svg>

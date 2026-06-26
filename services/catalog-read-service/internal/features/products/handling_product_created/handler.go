@@ -9,15 +9,18 @@ import (
 type Handler struct {
 	productRepo port.ProductRepository
 	inboxRepo   port.InboxRepository
+	cacheRepo   port.ProductCacheRepository
 }
 
 func NewHandler(
 	productRepo port.ProductRepository,
 	inboxRepo port.InboxRepository,
+	cacheRepo port.ProductCacheRepository,
 ) *Handler {
 	return &Handler{
 		productRepo: productRepo,
 		inboxRepo:   inboxRepo,
+		cacheRepo:   cacheRepo,
 	}
 }
 
@@ -31,6 +34,10 @@ func (h *Handler) Handle(ctx context.Context, command *Command) (*struct{}, erro
 	}
 
 	if err := h.productRepo.Upsert(ctx, command.Product); err != nil {
+		return nil, err
+	}
+
+	if err := h.cacheRepo.DeleteProducts(ctx); err != nil {
 		return nil, err
 	}
 

@@ -9,6 +9,11 @@
     "uri": "",
     "database": "catalog_read_db"
   },
+  "redisOptions": {
+    "addr": "localhost:6379",
+    "password": "",
+    "db": 0
+  },
   "rabbitMQOptions": {
     "url": "",
     "exchange": "catalog.events",
