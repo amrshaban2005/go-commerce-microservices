@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="760" viewBox="0 0 1400 760" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="820" viewBox="0 0 1500 820" role="img" aria-labelledby="title desc">
   <title id="title">Catalog Product Flow</title>
-  <desc id="desc">Colored sequence-style diagram for catalog write, outbox, RabbitMQ, catalog read projection, and product query.</desc>
+  <desc id="desc">Catalog product flow diagram with Redis cache, MongoDB read model, RabbitMQ, and Postgres write model.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#19324d" flood-opacity="0.12"/>
@@ -11,73 +11,101 @@
     <marker id="arrow-orange" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
       <path d="M2,2 L10,6 L2,10 Z" fill="#f97316"/>
     </marker>
+    <marker id="arrow-red" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#dc2626"/>
+    </marker>
     <style>
       .title { font: 700 30px Inter, Arial, sans-serif; fill: #0f172a; }
       .subtitle { font: 500 15px Inter, Arial, sans-serif; fill: #475569; }
       .label { font: 700 15px Inter, Arial, sans-serif; fill: #0f172a; }
       .step { font: 600 13px Inter, Arial, sans-serif; fill: #334155; }
+      .tiny { font: 600 12px Inter, Arial, sans-serif; fill: #64748b; }
       .lane { stroke: #cbd5e1; stroke-width: 2; stroke-dasharray: 7 7; }
       .box { filter: url(#shadow); stroke-width: 2; }
       .blue { fill: none; stroke: #2563eb; stroke-width: 3; marker-end: url(#arrow-blue); }
       .orange { fill: none; stroke: #f97316; stroke-width: 3; marker-end: url(#arrow-orange); }
+      .red { fill: none; stroke: #dc2626; stroke-width: 3; stroke-dasharray: 6 6; marker-end: url(#arrow-red); }
     </style>
   </defs>
 
-  <rect width="1400" height="760" fill="#f8fbff"/>
-  <text x="700" y="52" text-anchor="middle" class="title">Catalog Product Flow</text>
-  <text x="700" y="80" text-anchor="middle" class="subtitle">Create product on the write side, publish an event, project to MongoDB, then read from the query side.</text>
+  <rect width="1500" height="820" fill="#f8fbff"/>
+  <text x="750" y="52" text-anchor="middle" class="title">Catalog Product Flow</text>
+  <text x="750" y="80" text-anchor="middle" class="subtitle">Write to Postgres, publish ProductCreated, project to MongoDB, invalidate Redis, and serve reads from cache.</text>
 
-  <rect x="55" y="120" width="1290" height="575" rx="28" fill="#ffffff" stroke="#dbeafe" stroke-width="2"/>
+  <rect x="50" y="120" width="1400" height="640" rx="28" fill="#ffffff" stroke="#dbeafe" stroke-width="2"/>
 
   <g>
-    <rect x="95" y="145" width="150" height="58" rx="14" fill="#dbeafe" stroke="#60a5fa" class="box"/>
-    <text x="170" y="181" text-anchor="middle" class="label">Client</text>
-    <line x1="170" y1="215" x2="170" y2="655" class="lane"/>
+    <rect x="80" y="145" width="135" height="58" rx="14" fill="#dbeafe" stroke="#60a5fa" class="box"/>
+    <text x="147" y="181" text-anchor="middle" class="label">Client</text>
+    <line x1="147" y1="215" x2="147" y2="720" class="lane"/>
   </g>
   <g>
-    <rect x="285" y="145" width="165" height="58" rx="14" fill="#ede9fe" stroke="#8b5cf6" class="box"/>
-    <text x="367" y="181" text-anchor="middle" class="label">API Gateway</text>
-    <line x1="367" y1="215" x2="367" y2="655" class="lane"/>
+    <rect x="255" y="145" width="155" height="58" rx="14" fill="#ede9fe" stroke="#8b5cf6" class="box"/>
+    <text x="332" y="181" text-anchor="middle" class="label">API Gateway</text>
+    <line x1="332" y1="215" x2="332" y2="720" class="lane"/>
   </g>
   <g>
-    <rect x="500" y="145" width="180" height="58" rx="14" fill="#dcfce7" stroke="#22c55e" class="box"/>
-    <text x="590" y="181" text-anchor="middle" class="label">Catalog Write</text>
-    <line x1="590" y1="215" x2="590" y2="655" class="lane"/>
+    <rect x="455" y="145" width="165" height="58" rx="14" fill="#dcfce7" stroke="#22c55e" class="box"/>
+    <text x="537" y="181" text-anchor="middle" class="label">Catalog Write</text>
+    <line x1="537" y1="215" x2="537" y2="720" class="lane"/>
   </g>
   <g>
-    <rect x="730" y="145" width="155" height="58" rx="14" fill="#ecfdf5" stroke="#10b981" class="box"/>
-    <text x="807" y="181" text-anchor="middle" class="label">Postgres</text>
-    <line x1="807" y1="215" x2="807" y2="655" class="lane"/>
+    <rect x="665" y="145" width="135" height="58" rx="14" fill="#ecfdf5" stroke="#10b981" class="box"/>
+    <text x="732" y="181" text-anchor="middle" class="label">Postgres</text>
+    <line x1="732" y1="215" x2="732" y2="720" class="lane"/>
   </g>
   <g>
-    <rect x="930" y="145" width="155" height="58" rx="14" fill="#fff7ed" stroke="#f97316" class="box"/>
-    <text x="1007" y="181" text-anchor="middle" class="label">RabbitMQ</text>
-    <line x1="1007" y1="215" x2="1007" y2="655" class="lane"/>
+    <rect x="845" y="145" width="140" height="58" rx="14" fill="#fff7ed" stroke="#f97316" class="box"/>
+    <text x="915" y="181" text-anchor="middle" class="label">RabbitMQ</text>
+    <line x1="915" y1="215" x2="915" y2="720" class="lane"/>
   </g>
   <g>
-    <rect x="1130" y="145" width="170" height="58" rx="14" fill="#e0f2fe" stroke="#0ea5e9" class="box"/>
-    <text x="1215" y="181" text-anchor="middle" class="label">Catalog Read</text>
-    <line x1="1215" y1="215" x2="1215" y2="655" class="lane"/>
+    <rect x="1030" y="145" width="160" height="58" rx="14" fill="#e0f2fe" stroke="#0ea5e9" class="box"/>
+    <text x="1110" y="181" text-anchor="middle" class="label">Catalog Read</text>
+    <line x1="1110" y1="215" x2="1110" y2="720" class="lane"/>
+  </g>
+  <g>
+    <rect x="1230" y="132" width="150" height="46" rx="13" fill="#bbf7d0" stroke="#22c55e" class="box"/>
+    <text x="1305" y="162" text-anchor="middle" class="label">MongoDB</text>
+    <line x1="1305" y1="215" x2="1305" y2="720" class="lane"/>
+  </g>
+  <g>
+    <polygon points="1250,205 1305,183 1360,205 1305,227" fill="#ef4444" stroke="#991b1b" stroke-width="2" filter="url(#shadow)"/>
+    <polygon points="1250,225 1305,203 1360,225 1305,247" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
+    <polygon points="1250,245 1305,223 1360,245 1305,267" fill="#b91c1c" stroke="#991b1b" stroke-width="2"/>
+    <text x="1305" y="292" text-anchor="middle" class="label">Redis</text>
   </g>
 
-  <path d="M170 245 L367 245" class="blue"/>
-  <text x="195" y="236" class="step">1. Create product</text>
-  <path d="M367 285 L590 285" class="blue"/>
-  <text x="395" y="276" class="step">2. gRPC CreateProduct</text>
-  <path d="M590 325 L807 325" class="blue"/>
-  <text x="620" y="316" class="step">3. Save product + outbox</text>
-  <path d="M807 365 L590 365" class="blue"/>
-  <text x="620" y="356" class="step">4. Product created</text>
-  <path d="M590 405 L367 405" class="blue"/>
-  <path d="M367 445 L170 445" class="blue"/>
-  <text x="195" y="436" class="step">5. HTTP response</text>
+  <path d="M147 330 L332 330" class="blue"/>
+  <text x="170" y="321" class="step">1. Create product</text>
+  <path d="M332 370 L537 370" class="blue"/>
+  <text x="360" y="361" class="step">2. gRPC CreateProduct</text>
+  <path d="M537 410 L732 410" class="blue"/>
+  <text x="560" y="401" class="step">3. Save product + outbox</text>
+  <path d="M732 450 L537 450" class="blue"/>
+  <path d="M537 490 L332 490" class="blue"/>
+  <path d="M332 530 L147 530" class="blue"/>
+  <text x="170" y="521" class="step">4. HTTP response</text>
 
-  <path d="M590 505 L807 505" class="orange"/>
-  <text x="615" y="496" class="step">6. Outbox worker reads event</text>
-  <path d="M807 545 L1007 545" class="orange"/>
-  <text x="835" y="536" class="step">7. Publish ProductCreated</text>
-  <path d="M1007 585 L1215 585" class="orange"/>
-  <text x="1030" y="576" class="step">8. Consume event</text>
-  <path d="M1215 625 C1260 625, 1260 655, 1215 655" class="orange"/>
-  <text x="1040" y="646" class="step">9. Upsert Mongo projection</text>
+  <path d="M537 585 L732 585" class="orange"/>
+  <text x="560" y="576" class="step">5. Outbox worker reads event</text>
+  <path d="M732 625 L915 625" class="orange"/>
+  <text x="755" y="616" class="step">6. Publish ProductCreated</text>
+  <path d="M915 665 L1110 665" class="orange"/>
+  <text x="940" y="656" class="step">7. Consume event</text>
+  <path d="M1110 610 L1305 610" class="orange"/>
+  <text x="1140" y="601" class="step">8. Upsert Mongo projection</text>
+  <path d="M1110 560 C1175 520, 1235 505, 1295 292" class="red"/>
+  <text x="1138" y="533" class="step">9. Delete Redis products cache</text>
+
+  <path d="M147 260 L332 260" class="blue"/>
+  <text x="170" y="251" class="step">Read: Get products</text>
+  <path d="M332 285 L1110 285" class="blue"/>
+  <path d="M1110 320 C1160 285, 1220 285, 1295 292" class="red"/>
+  <text x="1138" y="308" class="step">Redis cache hit / miss</text>
+  <path d="M1110 350 C1185 350, 1240 340, 1305 330" class="blue"/>
+  <text x="1140" y="373" class="step">Mongo fallback on miss</text>
+
+  <text x="1125" y="232" class="tiny" fill="#2563eb">query side</text>
+  <text x="1235" y="317" class="tiny" fill="#dc2626">cache-aside</text>
 </svg>

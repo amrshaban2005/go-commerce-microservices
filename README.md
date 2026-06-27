@@ -1,6 +1,6 @@
 # Go Commerce Microservices
 
-`Go Commerce Microservices` is a learning-focused ecommerce backend built with Go and a small set of practical microservices patterns: gRPC service communication, REST API gateway, event-driven messaging with RabbitMQ, Saga workflow, Postgres write models, MongoDB read models, Outbox/Inbox patterns, dependency injection with Uber Fx, structured logging with Zap, and configuration with Viper.
+`Go Commerce Microservices` is a learning-focused ecommerce backend built with Go and a small set of practical microservices patterns: gRPC service communication, REST API gateway, event-driven messaging with RabbitMQ, Saga workflow, Postgres write models, MongoDB read models, Redis caching, Outbox/Inbox patterns, dependency injection with Uber Fx, structured logging with Zap, and configuration with Viper.
 
 ## Features
 
@@ -17,6 +17,7 @@
 - Using `Mediator Pattern` in catalog read service with `go-mediatr`.
 - Using `Postgres` for write-side services and transactional data.
 - Using `MongoDB` for catalog read projections.
+- Using `Redis` as a cache for catalog read queries.
 - Using `GORM` for Postgres persistence.
 - Using `Uber Fx` for dependency injection and application lifecycle.
 - Using `Zap` for structured logging.
@@ -77,6 +78,8 @@ Main responsibilities:
 
 - Consume catalog events from RabbitMQ.
 - Project product data into MongoDB.
+- Cache catalog read results in Redis.
+- Invalidate Redis cache when product events update the read model.
 - Serve product read queries over gRPC.
 - Use CQRS/Mediator handlers for catalog read features.
 
@@ -135,6 +138,7 @@ The project uses synchronous communication for request/response APIs and asynchr
 - Asynchronous path: services publish integration events through RabbitMQ.
 - Write services use Postgres for transactional data.
 - Catalog read service uses MongoDB as a read projection.
+- Redis caches catalog read results and is invalidated when product events are consumed.
 
 ## Code Architecture
 
@@ -217,6 +221,7 @@ Includes:
 - Postgres
 - RabbitMQ
 - MongoDB
+- Redis
 
 Services Compose file:
 
