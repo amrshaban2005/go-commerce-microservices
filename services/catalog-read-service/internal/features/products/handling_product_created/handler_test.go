@@ -31,6 +31,24 @@ type fakeInboxRepository struct {
 	isProcessedErr      error
 }
 
+type fakeProductCacheRepository struct {
+	deleteCalled bool
+	deleteErr    error
+}
+
+func (f *fakeProductCacheRepository) GetProducts(ctx context.Context) ([]domain.Product, error) {
+	return nil, nil
+}
+
+func (f *fakeProductCacheRepository) SetProducts(ctx context.Context, products []domain.Product) error {
+	return nil
+}
+
+func (f *fakeProductCacheRepository) DeleteProducts(ctx context.Context) error {
+	f.deleteCalled = true
+	return f.deleteErr
+}
+
 func (f *fakeInboxRepository) IsProcessed(ctx context.Context, messageID string) (bool, error) {
 	return f.processed, f.isProcessedErr
 }
@@ -43,12 +61,13 @@ func Test_Handler_NewMessage_UpsertsProductAndSavesInbox(t *testing.T) {
 
 	productRepo := mocks.NewProductRepository(t)
 	inboxRepo := mocks.NewInboxRepository(t)
+	cacheRepo := &fakeProductCacheRepository{}
 
 	productRepo.On("Upsert", mock.Anything, domain.Product{ID: "product-1"}).Return(nil).Once()
 	inboxRepo.On("IsProcessed", mock.Anything, "message1").Return(false, nil).Once()
 	inboxRepo.On("SaveProcessed", mock.Anything, "message1", "ProductCreated", []byte("payload")).Return(nil).Once()
 
-	handler := NewHandler(productRepo, inboxRepo)
+	handler := NewHandler(productRepo, inboxRepo, cacheRepo)
 	_, err := handler.Handle(context.Background(), &Command{
 		MessageID: "message1",
 		Product:   domain.Product{ID: "product-1"},
@@ -57,12 +76,16 @@ func Test_Handler_NewMessage_UpsertsProductAndSavesInbox(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error but got %v", err)
 	}
+	if !cacheRepo.deleteCalled {
+		t.Error("expected product cache to be invalidated")
+	}
 }
 
 func Test_Handler_ProductAlreadyCreated(t *testing.T) {
 	productRepo := &fakeProductRepository{}
 	inboxRepo := &fakeInboxRepository{processed: true}
-	handler := NewHandler(productRepo, inboxRepo)
+	cacheRepo := &fakeProductCacheRepository{}
+	handler := NewHandler(productRepo, inboxRepo, cacheRepo)
 	_, err := handler.Handle(context.Background(), &Command{
 		MessageID: "message1",
 		Product:   domain.Product{},
@@ -71,6 +94,9 @@ func Test_Handler_ProductAlreadyCreated(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error but got %v", err)
 	}
+	if cacheRepo.deleteCalled {
+		t.Error("expected cache not to be invalidated for an already processed message")
+	}
 }
 
 func Test_Handler_ReturnRepositoryError(t *testing.T) {
@@ -78,7 +104,7 @@ func Test_Handler_ReturnRepositoryError(t *testing.T) {
 	productRepo := &fakeProductRepository{err: err}
 	inboxRepo := &fakeInboxRepository{processed: false}
 
-	handler := NewHandler(productRepo, inboxRepo)
+	handler := NewHandler(productRepo, inboxRepo, &fakeProductCacheRepository{})
 	_, err = handler.Handle(context.Background(), &Command{
 		MessageID: "message2",
 		Product:   domain.Product{},
@@ -95,10 +121,12 @@ func Test_Handler_Handle(t *testing.T) {
 		isProcessed    bool
 		isProcessedErr error
 		upsertErr      error
+		deleteErr      error
 		saveErr        error
 
 		wantErr    bool
 		wantUpsert bool
+		wantDelete bool
 		wantSave   bool
 	}{
 		{
@@ -106,6 +134,7 @@ func Test_Handler_Handle(t *testing.T) {
 			isProcessed: true,
 			wantErr:     false,
 			wantUpsert:  false,
+			wantDelete:  false,
 			wantSave:    false,
 		},
 		{
@@ -113,6 +142,7 @@ func Test_Handler_Handle(t *testing.T) {
 			isProcessed: false,
 			wantErr:     false,
 			wantUpsert:  true,
+			wantDelete:  true,
 			wantSave:    true,
 		},
 		{
@@ -120,6 +150,7 @@ func Test_Handler_Handle(t *testing.T) {
 			isProcessedErr: errors.New("inbox failed"),
 			wantErr:        true,
 			wantUpsert:     false,
+			wantDelete:     false,
 			wantSave:       false,
 		},
 		{
@@ -128,6 +159,16 @@ func Test_Handler_Handle(t *testing.T) {
 			isProcessed: false,
 			wantErr:     true,
 			wantUpsert:  true,
+			wantDelete:  false,
+			wantSave:    false,
+		},
+		{
+			name:        "cache invalidation error",
+			deleteErr:   errors.New("redis failed"),
+			isProcessed: false,
+			wantErr:     true,
+			wantUpsert:  true,
+			wantDelete:  true,
 			wantSave:    false,
 		},
 		{
@@ -136,6 +177,7 @@ func Test_Handler_Handle(t *testing.T) {
 			isProcessed: false,
 			wantErr:     true,
 			wantUpsert:  true,
+			wantDelete:  true,
 			wantSave:    true,
 		},
 	}
@@ -151,8 +193,9 @@ func Test_Handler_Handle(t *testing.T) {
 				isProcessedErr: test.isProcessedErr,
 				saveErr:        test.saveErr,
 			}
+			cacheRepo := &fakeProductCacheRepository{deleteErr: test.deleteErr}
 
-			handler := NewHandler(productRepo, inboxRepo)
+			handler := NewHandler(productRepo, inboxRepo, cacheRepo)
 
 			_, err := handler.Handle(context.Background(), &Command{
 				MessageID: "message-1",
@@ -183,6 +226,14 @@ func Test_Handler_Handle(t *testing.T) {
 
 			if !test.wantUpsert && productRepo.upsertCalled {
 				t.Fatal("expected Upsert not to be called")
+			}
+
+			if test.wantDelete && !cacheRepo.deleteCalled {
+				t.Fatal("expected DeleteProducts to be called")
+			}
+
+			if !test.wantDelete && cacheRepo.deleteCalled {
+				t.Fatal("expected DeleteProducts not to be called")
 			}
 
 			if test.wantSave && !inboxRepo.saveProcessedCalled {

@@ -5,12 +5,20 @@ import (
 	"log"
 
 	appconfig "github.com/amrshaban2005/go-commerce-microservices/api-gateway/config"
+	_ "github.com/amrshaban2005/go-commerce-microservices/api-gateway/docs"
 	grpcclient "github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/grpc-client"
 	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/http/handler"
 	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/http/router"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// @title Go Commerce API
+// @version 1.0
+// @description Public HTTP API for Go Commerce Microservices.
+// @BasePath /api/v1
+// @schemes http
 func main() {
 	appOptions, err := appconfig.LoadAppOptions()
 	if err != nil {
@@ -43,6 +51,7 @@ func main() {
 	orderHandler := handler.NewOrderHandler(orderClient)
 
 	r := gin.Default()
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	api := r.Group("/api/v1")
 
 	router.RegisterProductRoutes(api, prodcutHandler)

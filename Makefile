@@ -58,6 +58,12 @@ run-docker-build:
 run-check-health:
 	./scripts/check-health.sh
 
+swagger:
+	cd api-gateway && swag init \
+		-g cmd/main.go \
+		-o docs \
+		--parseInternal
+
 fmt:
 	gofmt -w $$(git ls-files '*.go')
 

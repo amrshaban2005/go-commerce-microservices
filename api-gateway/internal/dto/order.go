@@ -14,7 +14,7 @@ type CreateOrderItem struct {
 	Quantity    int     `json:"quantity"`
 }
 
-type CreateOrderResponse struct {
+type OrderResponse struct {
 	ID          string      `json:"id"`
 	CustomerID  string      `json:"customer_id"`
 	Status      string      `json:"status"`
@@ -32,7 +32,7 @@ type OrderItem struct {
 	Subtotal    float64 `json:"subtotal"`
 }
 
-func FromOrderResponse(order *orderv1.Order) CreateOrderResponse {
+func FromOrderResponse(order *orderv1.Order) OrderResponse {
 	items := make([]OrderItem, 0, len(order.Items))
 
 	for _, item := range order.Items {
@@ -47,7 +47,7 @@ func FromOrderResponse(order *orderv1.Order) CreateOrderResponse {
 		})
 	}
 
-	return CreateOrderResponse{
+	return OrderResponse{
 		ID:          order.Id,
 		CustomerID:  order.CustomerId,
 		Status:      order.Status,

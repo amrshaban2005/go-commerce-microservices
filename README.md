@@ -1,6 +1,6 @@
 # Go Commerce Microservices
 
-`Go Commerce Microservices` is a learning-focused ecommerce backend built with Go and a small set of practical microservices patterns: gRPC service communication, REST API gateway, event-driven messaging with RabbitMQ, Saga workflow, Postgres write models, MongoDB read models, Redis caching, Elasticsearch product search, Outbox/Inbox patterns, dependency injection with Uber Fx, structured logging with Zap, and configuration with Viper.
+`Go Commerce Microservices` is a learning-focused ecommerce backend built with Go and a small set of practical microservices patterns: gRPC service communication, REST API gateway, Swagger API documentation, event-driven messaging with RabbitMQ, Saga workflow, Postgres write models, MongoDB read models, Redis caching, Elasticsearch product search, Outbox/Inbox patterns, dependency injection with Uber Fx, structured logging with Zap, and configuration with Viper.
 
 ## Features
 
@@ -9,6 +9,7 @@
 - Using `Hexagonal Architecture` style inside services with application core, ports, and adapters.
 - Using `gRPC` for internal service APIs.
 - Using a REST `API Gateway` built with `Gin`.
+- Using `Swaggo` and Swagger UI for generated API documentation and interactive requests.
 - Using `Event Driven Architecture` with `RabbitMQ`.
 - Using the `Outbox Pattern` for reliable message publishing from write-side services.
 - Using the `Inbox Pattern` for idempotent message consumption.
@@ -47,6 +48,8 @@ Main responsibilities:
 - Validate and map request DTOs.
 - Call catalog/order gRPC services.
 - Return HTTP responses to clients.
+- Generate the public API specification from handler annotations.
+- Serve interactive Swagger UI for the gateway endpoints.
 
 ### Catalog Write Service
 
@@ -231,6 +234,24 @@ The project uses:
 
 Environment variables should override config file values.
 
+## API Documentation
+
+The API Gateway uses `swaggo/swag` annotations to generate a Swagger 2.0 specification for its public HTTP endpoints. Backend service gRPC contracts remain documented by their Protocol Buffer files.
+
+Generate or refresh the Swagger files:
+
+```bash
+make swagger
+```
+
+With the API Gateway running, open:
+
+```text
+http://localhost:8080/swagger/index.html
+```
+
+Swagger UI documents the product listing, Elasticsearch product search, product creation, order creation, and order lookup endpoints. It can also execute requests directly against the running gateway.
+
 ## Infrastructure
 
 Infrastructure is separated from application services.
@@ -293,6 +314,12 @@ Generate protobuf code:
 
 ```bash
 make proto
+```
+
+Generate Swagger documentation:
+
+```bash
+make swagger
 ```
 
 Run a service with Air:
