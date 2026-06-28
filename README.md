@@ -1,6 +1,6 @@
 # Go Commerce Microservices
 
-`Go Commerce Microservices` is a learning-focused ecommerce backend built with Go and a small set of practical microservices patterns: gRPC service communication, REST API gateway, event-driven messaging with RabbitMQ, Saga workflow, Postgres write models, MongoDB read models, Redis caching, Outbox/Inbox patterns, dependency injection with Uber Fx, structured logging with Zap, and configuration with Viper.
+`Go Commerce Microservices` is a learning-focused ecommerce backend built with Go and a small set of practical microservices patterns: gRPC service communication, REST API gateway, event-driven messaging with RabbitMQ, Saga workflow, Postgres write models, MongoDB read models, Redis caching, Elasticsearch product search, Outbox/Inbox patterns, dependency injection with Uber Fx, structured logging with Zap, and configuration with Viper.
 
 ## Features
 
@@ -18,6 +18,7 @@
 - Using `Postgres` for write-side services and transactional data.
 - Using `MongoDB` for catalog read projections.
 - Using `Redis` as a cache for catalog read queries.
+- Using `Elasticsearch` for full-text product search across product names and descriptions.
 - Using `GORM` for Postgres persistence.
 - Using `Uber Fx` for dependency injection and application lifecycle.
 - Using `Zap` for structured logging.
@@ -72,7 +73,7 @@ Path:
 services/catalog-read-service/
 ```
 
-The read side of catalog. It consumes product events and stores read projections in MongoDB.
+The read side of catalog. It consumes product events, stores read projections in MongoDB, caches regular reads in Redis, and maintains a separate Elasticsearch search index.
 
 Main responsibilities:
 
@@ -80,6 +81,9 @@ Main responsibilities:
 - Project product data into MongoDB.
 - Cache catalog read results in Redis.
 - Invalidate Redis cache when product events update the read model.
+- Consume `ProductCreated` through a dedicated search projection queue.
+- Index products in Elasticsearch using the product ID as the document ID for idempotency.
+- Search product names and descriptions through Elasticsearch.
 - Serve product read queries over gRPC.
 - Use CQRS/Mediator handlers for catalog read features.
 
@@ -139,6 +143,8 @@ The project uses synchronous communication for request/response APIs and asynchr
 - Write services use Postgres for transactional data.
 - Catalog read service uses MongoDB as a read projection.
 - Redis caches catalog read results and is invalidated when product events are consumed.
+- Elasticsearch stores a separate, rebuildable product search projection.
+- RabbitMQ fans out `ProductCreated` to independent MongoDB and Elasticsearch projection queues.
 
 ## Code Architecture
 
@@ -174,6 +180,25 @@ This is a choreography-based Saga because services react to events directly. The
 ### Catalog Product Flow
 
 ![Catalog Product Flow](./assets/catalog-product-flow-diagram.svg)
+
+The catalog read side has two independent projections for the same `ProductCreated` event:
+
+```text
+catalog.events / product.created
+    |-- catalog-read.product-created    -> MongoDB projection -> invalidate Redis
+    `-- catalog-search.product-created -> Elasticsearch index
+```
+
+The Elasticsearch document `_id` is the product ID. Redelivering the same event therefore replaces the same document instead of creating duplicates.
+
+Regular catalog reads and product search follow different paths:
+
+```text
+GET /api/v1/products           -> Redis -> MongoDB on cache miss
+GET /api/v1/products/search?q= -> Elasticsearch
+```
+
+The current search uses Elasticsearch `multi_match` over `name^2` and `description`. A match in the product name receives more relevance weight than a description match. This is token-based full-text search; substring matching and autocomplete would require a separate prefix or `edge_ngram` mapping.
 
 ### Order Flow
 
@@ -222,6 +247,7 @@ Includes:
 - RabbitMQ
 - MongoDB
 - Redis
+- Elasticsearch
 
 Services Compose file:
 
@@ -325,7 +351,7 @@ Current E2E tests live in:
 services/test/e2e/
 ```
 
-E2E tests are intended to run against the Docker Compose environment. They may write test data to Postgres and MongoDB, so use unique test data and clean volumes when needed.
+E2E tests are intended to run against the Docker Compose environment. They may write test data to Postgres, MongoDB, and Elasticsearch, so use unique test data and clean volumes when needed.
 
 ## CI
 

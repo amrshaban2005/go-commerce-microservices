@@ -13,6 +13,8 @@ import (
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/database"
 	gettingproducts "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/getting_products"
 	handlingproductcreated "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/handling_product_created"
+	indexingproduct "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/indexing_product"
+	searchingproducts "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/searching_products"
 	"github.com/mehdihadeli/go-mediatr"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -27,19 +29,26 @@ func Module() fx.Option {
 			provideAppOptions,
 			provideMongoOptions,
 			database.LoadRedisOptions,
+			provideElasticsearchOptions,
 			provideRabbitMQOptions,
 			provideLogger,
 			provideMongoClient,
 			provideMongoDatabase,
 			database.NewRedisClient,
+			database.NewElasticsearchClient,
 			repository.NewProductRepositoryMongo,
 			repository.NewInboxMessageMongoRepository,
 			repository.NewProductCacheRepositoryRedis,
+			repository.NewProductSearchRepositoryElasticsearch,
 			gettingproducts.NewHandler,
 			handlingproductcreated.NewHandler,
+			indexingproduct.NewHandler,
+			searchingproducts.NewHandler,
 			provideRabbitMQConnection,
 			provideRabbitMQChannel,
+			provideProductSearchChannel,
 			provideProductCreatedConsumer,
+			provideProductSearchIndexConsumer,
 		),
 		fx.Invoke(
 			StartConsumer,
@@ -47,6 +56,14 @@ func Module() fx.Option {
 			RegisterMediatorHandlers,
 		),
 	)
+}
+
+func provideElasticsearchOptions() (*database.ElasticsearchOptions, error) {
+	options, err := database.LoadElasticsearchOptions()
+	if err != nil {
+		return nil, err
+	}
+	return options, options.Validate()
 }
 
 func provideAppOptions() (*appconfig.AppOptions, error) {
@@ -155,6 +172,28 @@ func provideRabbitMQChannel(conn *amqp.Connection, lifecycle fx.Lifecycle) (*amq
 	return channel, nil
 }
 
+type productSearchChannel struct {
+	channel *amqp.Channel
+}
+
+func provideProductSearchChannel(
+	conn *amqp.Connection,
+	lifecycle fx.Lifecycle,
+) (*productSearchChannel, error) {
+	channel, err := conn.Channel()
+	if err != nil {
+		return nil, err
+	}
+
+	lifecycle.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			return channel.Close()
+		},
+	})
+
+	return &productSearchChannel{channel: channel}, nil
+}
+
 func provideProductCreatedConsumer(
 	channel *amqp.Channel,
 	options *messaging.RabbitMQOptions,
@@ -168,16 +207,30 @@ func provideProductCreatedConsumer(
 	)
 }
 
+func provideProductSearchIndexConsumer(
+	channel *productSearchChannel,
+	options *messaging.RabbitMQOptions,
+	logger *zap.Logger,
+) *messaging.ProductSearchIndexConsumer {
+	return messaging.NewProductSearchIndexConsumer(
+		channel.channel,
+		options.Exchange,
+		options.ProductSearchQueue,
+		logger.With(zap.String("component", "product_search_index_consumer")),
+	)
+}
+
 func StartConsumer(
 	lifecycle fx.Lifecycle,
 	consumer *messaging.ProductCreatedConsumer,
+	searchIndexConsumer *messaging.ProductSearchIndexConsumer,
 	logger *zap.Logger,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	lifecycle.Append(fx.Hook{
 		OnStart: func(startCtx context.Context) error {
-			logger.Info("starting product created consumer")
+			logger.Info("starting catalog projection consumers")
 
 			go func() {
 				err := consumer.Start(ctx)
@@ -187,6 +240,16 @@ func StartConsumer(
 				}
 
 				logger.Info("consumer stopped")
+			}()
+
+			go func() {
+				err := searchIndexConsumer.Start(ctx)
+				if err != nil {
+					logger.Error("product search index consumer stopped with error", zap.Error(err))
+					return
+				}
+
+				logger.Info("product search index consumer stopped")
 			}()
 
 			return nil
@@ -235,6 +298,8 @@ func StartGRPCServer(
 func RegisterMediatorHandlers(
 	getProductsHandler *gettingproducts.Handler,
 	productCreatedHandler *handlingproductcreated.Handler,
+	indexProductHandler *indexingproduct.Handler,
+	searchProductsHandler *searchingproducts.Handler,
 ) error {
 	if err := mediatr.RegisterRequestHandler[*gettingproducts.Query, *gettingproducts.Result](
 		getProductsHandler,
@@ -244,6 +309,18 @@ func RegisterMediatorHandlers(
 
 	if err := mediatr.RegisterRequestHandler[*handlingproductcreated.Command, *struct{}](
 		productCreatedHandler,
+	); err != nil {
+		return err
+	}
+
+	if err := mediatr.RegisterRequestHandler[*indexingproduct.Command, *struct{}](
+		indexProductHandler,
+	); err != nil {
+		return err
+	}
+
+	if err := mediatr.RegisterRequestHandler[*searchingproducts.Query, *searchingproducts.Result](
+		searchProductsHandler,
 	); err != nil {
 		return err
 	}

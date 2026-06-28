@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CatalogReadService_GetProducts_FullMethodName = "/catalog.v1.CatalogReadService/GetProducts"
+	CatalogReadService_GetProducts_FullMethodName    = "/catalog.v1.CatalogReadService/GetProducts"
+	CatalogReadService_SearchProducts_FullMethodName = "/catalog.v1.CatalogReadService/SearchProducts"
 )
 
 // CatalogReadServiceClient is the client API for CatalogReadService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CatalogReadServiceClient interface {
 	GetProducts(ctx context.Context, in *GetProductsRequest, opts ...grpc.CallOption) (*GetProductsResponse, error)
+	SearchProducts(ctx context.Context, in *SearchProductsRequest, opts ...grpc.CallOption) (*SearchProductsResponse, error)
 }
 
 type catalogReadServiceClient struct {
@@ -47,11 +49,22 @@ func (c *catalogReadServiceClient) GetProducts(ctx context.Context, in *GetProdu
 	return out, nil
 }
 
+func (c *catalogReadServiceClient) SearchProducts(ctx context.Context, in *SearchProductsRequest, opts ...grpc.CallOption) (*SearchProductsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchProductsResponse)
+	err := c.cc.Invoke(ctx, CatalogReadService_SearchProducts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CatalogReadServiceServer is the server API for CatalogReadService service.
 // All implementations must embed UnimplementedCatalogReadServiceServer
 // for forward compatibility.
 type CatalogReadServiceServer interface {
 	GetProducts(context.Context, *GetProductsRequest) (*GetProductsResponse, error)
+	SearchProducts(context.Context, *SearchProductsRequest) (*SearchProductsResponse, error)
 	mustEmbedUnimplementedCatalogReadServiceServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedCatalogReadServiceServer struct{}
 
 func (UnimplementedCatalogReadServiceServer) GetProducts(context.Context, *GetProductsRequest) (*GetProductsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetProducts not implemented")
+}
+func (UnimplementedCatalogReadServiceServer) SearchProducts(context.Context, *SearchProductsRequest) (*SearchProductsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchProducts not implemented")
 }
 func (UnimplementedCatalogReadServiceServer) mustEmbedUnimplementedCatalogReadServiceServer() {}
 func (UnimplementedCatalogReadServiceServer) testEmbeddedByValue()                            {}
@@ -104,6 +120,24 @@ func _CatalogReadService_GetProducts_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CatalogReadService_SearchProducts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchProductsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CatalogReadServiceServer).SearchProducts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CatalogReadService_SearchProducts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CatalogReadServiceServer).SearchProducts(ctx, req.(*SearchProductsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CatalogReadService_ServiceDesc is the grpc.ServiceDesc for CatalogReadService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var CatalogReadService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetProducts",
 			Handler:    _CatalogReadService_GetProducts_Handler,
+		},
+		{
+			MethodName: "SearchProducts",
+			Handler:    _CatalogReadService_SearchProducts_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

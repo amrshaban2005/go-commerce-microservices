@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	grpcclient "github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/grpc-client"
 	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/dto"
@@ -12,6 +13,22 @@ import (
 type ProductHandler struct {
 	readCatalogClient  *grpcclient.ReadCatalogClient
 	writeCatalogClient *grpcclient.WriteCatalogClient
+}
+
+func (h *ProductHandler) SearchProducts(c *gin.Context) {
+	query := strings.TrimSpace(c.Query("q"))
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "search query is required"})
+		return
+	}
+
+	products, err := h.readCatalogClient.SearchProducts(c.Request.Context(), query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"failed to search products": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.FromCatalogProducts(products))
 }
 
 func NewProductHandler(readCatalogClient *grpcclient.ReadCatalogClient, writeCatalogClient *grpcclient.WriteCatalogClient) *ProductHandler {

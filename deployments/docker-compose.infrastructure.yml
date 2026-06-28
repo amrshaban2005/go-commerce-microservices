@@ -71,9 +71,30 @@ services:
       retries: 10
       start_period: 5s
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.1
+    container_name: elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "${ELASTICSEARCH_PORT}:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
 volumes:
   postgres_data:
   mongo_data:
+  elasticsearch_data:
 
 networks:
   ecommerce-network:

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="950" viewBox="0 0 1500 950" role="img" aria-labelledby="title desc">
   <title id="title">Go Commerce Microservices System Architecture</title>
-  <desc id="desc">Architecture diagram with API Gateway, catalog services, order service, inventory service, Postgres, MongoDB, Redis, and RabbitMQ.</desc>
+  <desc id="desc">Architecture diagram with API Gateway, catalog services, order service, inventory service, Postgres, MongoDB, Redis, Elasticsearch, and RabbitMQ.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#19324d" flood-opacity="0.15"/>
@@ -17,6 +17,9 @@
     <marker id="arrow-red" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
       <path d="M2,2 L10,6 L2,10 Z" fill="#dc2626"/>
     </marker>
+    <marker id="arrow-purple" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#7c3aed"/>
+    </marker>
     <style>
       .title { font: 700 34px Inter, Arial, sans-serif; fill: #0f172a; }
       .subtitle { font: 500 16px Inter, Arial, sans-serif; fill: #475569; }
@@ -30,12 +33,13 @@
       .event { fill: none; stroke: #f97316; stroke-width: 3; marker-end: url(#arrow-orange); }
       .data { fill: none; stroke: #64748b; stroke-width: 2.6; stroke-dasharray: 8 7; marker-end: url(#arrow-slate); }
       .cache { fill: none; stroke: #dc2626; stroke-width: 3; stroke-dasharray: 6 6; marker-end: url(#arrow-red); }
+      .search { fill: none; stroke: #7c3aed; stroke-width: 2.8; stroke-dasharray: 5 5; marker-end: url(#arrow-purple); }
     </style>
   </defs>
 
   <rect width="1500" height="950" fill="#f8fbff"/>
   <text x="750" y="58" text-anchor="middle" class="title">Go Commerce Microservices</text>
-  <text x="750" y="88" text-anchor="middle" class="subtitle">gRPC services, RabbitMQ events, Postgres write models, MongoDB read projection, and Redis cache</text>
+  <text x="750" y="88" text-anchor="middle" class="subtitle">gRPC services, RabbitMQ events, Postgres writes, MongoDB reads, Redis cache, and Elasticsearch search</text>
 
   <rect x="55" y="125" width="1390" height="760" rx="28" fill="#ffffff" stroke="#dbeafe" stroke-width="2"/>
 
@@ -78,7 +82,7 @@
 
   <rect x="500" y="440" width="225" height="88" rx="18" fill="#e0f2fe" stroke="#0ea5e9" class="box"/>
   <text x="612" y="476" text-anchor="middle" class="label">Catalog Read</text>
-  <text x="612" y="501" text-anchor="middle" class="small">read projection + cache</text>
+  <text x="612" y="501" text-anchor="middle" class="small">read + search projections</text>
 
   <rect x="795" y="440" width="225" height="88" rx="18" fill="#fef3c7" stroke="#f59e0b" class="box"/>
   <text x="907" y="476" text-anchor="middle" class="label">Order Service</text>
@@ -97,7 +101,7 @@
     <text x="85" y="102" text-anchor="middle" class="tiny">catalog_write_db</text>
   </g>
 
-  <g transform="translate(505 552)">
+  <g transform="translate(445 552)">
     <ellipse cx="60" cy="18" rx="60" ry="18" fill="#dcfce7" stroke="#22c55e" stroke-width="2"/>
     <rect x="0" y="18" width="120" height="58" fill="#bbf7d0" stroke="#22c55e" stroke-width="2"/>
     <ellipse cx="60" cy="76" rx="60" ry="18" fill="#86efac" stroke="#22c55e" stroke-width="2"/>
@@ -105,13 +109,22 @@
     <text x="60" y="107" text-anchor="middle" class="tiny">read model</text>
   </g>
 
-  <g transform="translate(648 553)">
-    <polygon points="18,28 88,0 158,28 88,56" fill="#ef4444" stroke="#991b1b" stroke-width="2"/>
-    <polygon points="18,50 88,22 158,50 88,78" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
-    <polygon points="18,72 88,44 158,72 88,100" fill="#b91c1c" stroke="#991b1b" stroke-width="2"/>
-    <rect x="70" y="25" width="18" height="18" fill="#ffffff" opacity="0.9"/>
-    <circle cx="108" cy="46" r="9" fill="#ffffff" opacity="0.9"/>
-    <text x="88" y="122" text-anchor="middle" class="tiny">Redis cache</text>
+  <g transform="translate(585 560)">
+    <polygon points="4,20 54,0 104,20 54,40" fill="#ef4444" stroke="#991b1b" stroke-width="2"/>
+    <polygon points="4,38 54,18 104,38 54,58" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
+    <polygon points="4,56 54,36 104,56 54,76" fill="#b91c1c" stroke="#991b1b" stroke-width="2"/>
+    <rect x="43" y="18" width="13" height="13" fill="#ffffff" opacity="0.9"/>
+    <circle cx="70" cy="35" r="6" fill="#ffffff" opacity="0.9"/>
+    <text x="54" y="98" text-anchor="middle" class="tiny">Redis cache</text>
+  </g>
+
+  <g transform="translate(710 552)">
+    <circle cx="55" cy="45" r="39" fill="#ffffff" stroke="#7c3aed" stroke-width="2"/>
+    <path d="M29 29 A30 30 0 0 1 56 17 L65 36 L44 47 Z" fill="#fbbf24"/>
+    <path d="M65 36 L82 27 A30 30 0 0 1 85 58 L61 58 Z" fill="#22d3ee"/>
+    <path d="M44 47 L61 58 L79 70 A30 30 0 0 1 35 70 L26 54 Z" fill="#111827"/>
+    <text x="55" y="105" text-anchor="middle" class="tiny">Elasticsearch</text>
+    <text x="55" y="122" text-anchor="middle" class="tiny">product search</text>
   </g>
 
   <g transform="translate(835 552)">
@@ -147,8 +160,9 @@
 
   <!-- Data arrows -->
   <path d="M317 528 L317 552" class="data"/>
-  <path d="M587 528 L565 552" class="data"/>
-  <path d="M637 528 L725 553" class="cache"/>
+  <path d="M565 528 L505 552" class="data"/>
+  <path d="M612 528 L639 560" class="cache"/>
+  <path d="M660 528 L765 552" class="search"/>
   <path d="M907 528 L907 552" class="data"/>
   <path d="M1202 528 L1202 552" class="data"/>
 
@@ -164,6 +178,7 @@
   <text x="1280" y="542" class="tiny" fill="#64748b">local transactions</text>
   <text x="740" y="676" class="tiny" fill="#f97316">events</text>
   <text x="742" y="538" class="tiny" fill="#dc2626">cache</text>
+  <text x="716" y="521" class="tiny" fill="#7c3aed">search index</text>
 
   <rect x="120" y="724" width="335" height="72" rx="18" fill="#ffffff" stroke="#fed7aa"/>
   <text x="145" y="754" class="small">Event examples:</text>
@@ -171,5 +186,5 @@
 
   <rect x="1045" y="724" width="330" height="72" rx="18" fill="#ffffff" stroke="#fed7aa"/>
   <text x="1070" y="754" class="small">Patterns:</text>
-  <text x="1070" y="778" class="tiny">Saga, Outbox, Inbox, CQRS, Redis cache</text>
+  <text x="1070" y="778" class="tiny">Saga, Outbox, Inbox, CQRS, Redis, Elasticsearch</text>
 </svg>

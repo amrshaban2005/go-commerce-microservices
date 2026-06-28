@@ -14,9 +14,14 @@
     "password": "",
     "db": 0
   },
+  "elasticsearchOptions": {
+    "url": "http://elasticsearch:9200",
+    "productsIndex": "catalog-products"
+  },
   "rabbitMQOptions": {
     "url": "",
     "exchange": "catalog.events",
-    "productCreatedQueue": "catalog-read.product-created"
+    "productCreatedQueue": "catalog-read.product-created",
+    "productSearchQueue": "catalog-search.product-created"
   }
 }

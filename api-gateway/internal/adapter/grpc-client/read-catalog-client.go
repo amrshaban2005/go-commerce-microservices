@@ -30,3 +30,12 @@ func (c ReadCatalogClient) GetProducts(ctx context.Context) ([]*catalogv1.Produc
 	return response.Products, nil
 
 }
+
+func (c ReadCatalogClient) SearchProducts(ctx context.Context, query string) ([]*catalogv1.Product, error) {
+	response, err := c.client.SearchProducts(ctx, &catalogv1.SearchProductsRequest{Query: query})
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Products, nil
+}

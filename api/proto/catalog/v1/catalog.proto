@@ -6,6 +6,7 @@ option go_package = "github.com/amrshaban2005/go-commerce-microservices/api/gen/
 
 service CatalogReadService {
   rpc GetProducts(GetProductsRequest) returns (GetProductsResponse);
+  rpc SearchProducts(SearchProductsRequest) returns (SearchProductsResponse);
 }
 
 service CatalogWriteService {
@@ -22,6 +23,14 @@ message Product {
 message GetProductsRequest {}
 
 message GetProductsResponse {
+  repeated Product products = 1;
+}
+
+message SearchProductsRequest {
+  string query = 1;
+}
+
+message SearchProductsResponse {
   repeated Product products = 1;
 }
 

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="820" viewBox="0 0 1500 820" role="img" aria-labelledby="title desc">
   <title id="title">Catalog Product Flow</title>
-  <desc id="desc">Catalog product flow diagram with Redis cache, MongoDB read model, RabbitMQ, and Postgres write model.</desc>
+  <desc id="desc">Catalog product flow diagram with Redis cache, MongoDB read model, Elasticsearch search projection, RabbitMQ, and Postgres write model.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#19324d" flood-opacity="0.12"/>
@@ -30,7 +30,7 @@
 
   <rect width="1500" height="820" fill="#f8fbff"/>
   <text x="750" y="52" text-anchor="middle" class="title">Catalog Product Flow</text>
-  <text x="750" y="80" text-anchor="middle" class="subtitle">Write to Postgres, publish ProductCreated, project to MongoDB, invalidate Redis, and serve reads from cache.</text>
+  <text x="750" y="80" text-anchor="middle" class="subtitle">Publish ProductCreated to independent MongoDB and Elasticsearch projections; cache regular reads in Redis.</text>
 
   <rect x="50" y="120" width="1400" height="640" rx="28" fill="#ffffff" stroke="#dbeafe" stroke-width="2"/>
 
@@ -75,6 +75,13 @@
     <polygon points="1250,245 1305,223 1360,245 1305,267" fill="#b91c1c" stroke="#991b1b" stroke-width="2"/>
     <text x="1305" y="292" text-anchor="middle" class="label">Redis</text>
   </g>
+  <g>
+    <rect x="1230" y="680" width="150" height="52" rx="14" fill="#ede9fe" stroke="#7c3aed" class="box"/>
+    <circle cx="1255" cy="706" r="14" fill="#fbbf24"/>
+    <path d="M1255 692 A14 14 0 0 1 1268 711 L1253 711 Z" fill="#22d3ee"/>
+    <path d="M1253 711 L1264 717 A14 14 0 0 1 1244 717 Z" fill="#111827"/>
+    <text x="1310" y="711" text-anchor="middle" class="label">Elasticsearch</text>
+  </g>
 
   <path d="M147 330 L332 330" class="blue"/>
   <text x="170" y="321" class="step">1. Create product</text>
@@ -92,11 +99,15 @@
   <path d="M732 625 L915 625" class="orange"/>
   <text x="755" y="616" class="step">6. Publish ProductCreated</text>
   <path d="M915 665 L1110 665" class="orange"/>
-  <text x="940" y="656" class="step">7. Consume event</text>
+  <text x="940" y="656" class="step">7. Mongo projection queue</text>
+  <path d="M915 700 L1110 700" class="orange"/>
+  <text x="940" y="691" class="step">7b. Search projection queue</text>
   <path d="M1110 610 L1305 610" class="orange"/>
   <text x="1140" y="601" class="step">8. Upsert Mongo projection</text>
   <path d="M1110 560 C1175 520, 1235 505, 1295 292" class="red"/>
   <text x="1138" y="533" class="step">9. Delete Redis products cache</text>
+  <path d="M1110 700 L1230 706" class="orange"/>
+  <text x="1118" y="727" class="tiny">10. Index by product ID</text>
 
   <path d="M147 260 L332 260" class="blue"/>
   <text x="170" y="251" class="step">Read: Get products</text>

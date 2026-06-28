@@ -16,3 +16,8 @@ type ProductCacheRepository interface {
 	SetProducts(ctx context.Context, products []domain.Product) error
 	DeleteProducts(ctx context.Context) error
 }
+
+type ProductSearchRepository interface {
+	Index(ctx context.Context, product domain.Product) error
+	Search(ctx context.Context, text string) ([]domain.Product, error)
+}

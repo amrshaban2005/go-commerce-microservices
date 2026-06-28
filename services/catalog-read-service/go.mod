@@ -5,8 +5,10 @@ go 1.26.3
 require (
 	github.com/amrshaban2005/go-commerce-microservices/api/gen/go v0.0.0-20260613003230-f1fff7f8abff
 	github.com/amrshaban2005/go-commerce-microservices/pkg v0.0.0-20260617231701-9c0d1c4202ed
+	github.com/elastic/go-elasticsearch/v9 v9.4.0
 	github.com/mehdihadeli/go-mediatr v1.4.0
 	github.com/rabbitmq/amqp091-go v1.11.0
+	github.com/redis/go-redis/v9 v9.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go/modules/mongodb v0.43.0
 	go.mongodb.org/mongo-driver/v2 v2.6.0
@@ -31,6 +33,7 @@ require (
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.9.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -57,7 +60,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
-	github.com/redis/go-redis/v9 v9.21.0 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.5 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect

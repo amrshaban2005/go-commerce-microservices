@@ -9,6 +9,7 @@ func RegisterProductRoutes(rg *gin.RouterGroup, h *handler.ProductHandler) {
 	products := rg.Group("/products")
 	{
 		products.GET("", h.GetProducts)
+		products.GET("/search", h.SearchProducts)
 		products.POST("", h.CreateProduct)
 	}
 }
