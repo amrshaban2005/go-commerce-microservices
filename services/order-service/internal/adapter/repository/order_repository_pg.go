@@ -118,6 +118,16 @@ func (r orderRepositoryPG) GetOrder(ctx context.Context, orderID uuid.UUID) (*do
 	return toDomainOrder(orderModel, orderModel.Items), nil
 }
 
+func (r orderRepositoryPG) GetOrders(ctx context.Context) ([]domain.Order, error) {
+	var orderModels []OrderDataModel
+
+	if err := r.db.WithContext(ctx).Preload("Items").Find(&orderModels).Error; err != nil {
+		return nil, err
+	}
+
+	return toDomainOrders(orderModels), nil
+}
+
 func toOrderDataModel(order *domain.Order) OrderDataModel {
 	return OrderDataModel{
 		ID:          order.ID,
@@ -157,6 +167,16 @@ func toDomainOrder(orderModel OrderDataModel, itemModels []OrderItemDataModel) *
 		CreatedAt:   orderModel.CreatedAt,
 		UpdatedAt:   orderModel.UpdatedAt,
 	}
+}
+
+func toDomainOrders(orderModels []OrderDataModel) []domain.Order {
+	orders := make([]domain.Order, 0, len(orderModels))
+
+	for _, orderModel := range orderModels {
+		orders = append(orders, *toDomainOrder(orderModel, orderModel.Items))
+	}
+
+	return orders
 }
 
 func toDomainOrderItems(itemModels []OrderItemDataModel) []domain.OrderItems {

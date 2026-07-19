@@ -69,6 +69,25 @@ func (s *OrderServer) GetOrder(ctx context.Context, in *orderv1.GetOrderRequest)
 	return &orderv1.GetOrderResponse{Order: toProtoOrder(order)}, nil
 }
 
+func (s *OrderServer) GetOrders(ctx context.Context, in *orderv1.GetOrdersRequest) (*orderv1.GetOrdersResponse, error) {
+	orders, err := s.svc.GetOrders(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &orderv1.GetOrdersResponse{Orders: toProtoOrders(orders)}, nil
+}
+
+func toProtoOrders(orders []domain.Order) []*orderv1.Order {
+	result := make([]*orderv1.Order, 0, len(orders))
+
+	for _, order := range orders {
+		result = append(result, toProtoOrder(&order))
+	}
+
+	return result
+}
+
 func toProtoOrder(order *domain.Order) *orderv1.Order {
 	items := make([]*orderv1.OrderItem, 0, len(order.Items))
 

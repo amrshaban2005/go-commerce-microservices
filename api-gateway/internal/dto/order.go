@@ -32,6 +32,16 @@ type OrderItem struct {
 	Subtotal    float64 `json:"subtotal"`
 }
 
+func FromOrdersResponse(orders []*orderv1.Order) []OrderResponse {
+	result := make([]OrderResponse, 0, len(orders))
+
+	for _, order := range orders {
+		result = append(result, FromOrderResponse(order))
+	}
+
+	return result
+}
+
 func FromOrderResponse(order *orderv1.Order) OrderResponse {
 	items := make([]OrderItem, 0, len(order.Items))
 

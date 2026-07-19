@@ -40,3 +40,11 @@ func (c OrderClient) GetOrder(ctx context.Context, orderID string) (*orderv1.Ord
 	}
 	return response.Order, nil
 }
+
+func (c OrderClient) GetOrders(ctx context.Context) ([]*orderv1.Order, error) {
+	response, err := c.client.GetOrders(ctx, &orderv1.GetOrdersRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return response.Orders, nil
+}

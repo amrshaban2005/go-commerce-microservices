@@ -105,6 +105,10 @@ func (s *orderService) GetOrder(ctx context.Context, orderID uuid.UUID) (*domain
 	return s.orderRepo.GetOrder(ctx, orderID)
 }
 
+func (s *orderService) GetOrders(ctx context.Context) ([]domain.Order, error) {
+	return s.orderRepo.GetOrders(ctx)
+}
+
 func reserveStockItems(items []domain.OrderItems) []map[string]any {
 	result := make([]map[string]any, 0, len(items))
 

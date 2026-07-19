@@ -13,6 +13,7 @@ type OrderRespository interface {
 	ConfirmOrder(ctx context.Context, orderID uuid.UUID) error
 	RejectOrder(ctx context.Context, orderID uuid.UUID) error
 	GetOrder(ctx context.Context, orderID uuid.UUID) (*domain.Order, error)
+	GetOrders(ctx context.Context) ([]domain.Order, error)
 }
 
 type OrderService interface {
@@ -20,4 +21,5 @@ type OrderService interface {
 	HandleConfirmOrder(ctx context.Context, orderID uuid.UUID, messageID uuid.UUID, payload []byte) error
 	HandleRejectOrder(ctx context.Context, orderID uuid.UUID, messageID uuid.UUID, payload []byte) error
 	GetOrder(ctx context.Context, orderID uuid.UUID) (*domain.Order, error)
+	GetOrders(ctx context.Context) ([]domain.Order, error)
 }

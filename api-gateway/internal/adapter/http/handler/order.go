@@ -42,6 +42,24 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	c.JSON(http.StatusCreated, dto.FromOrderResponse(order))
 }
 
+// GetOrders godoc
+// @Summary Get orders
+// @Description Return all orders
+// @Tags Orders
+// @Produce json
+// @Success 200 {array} dto.OrderResponse
+// @Failure 500 {object} dto.ErrorResponse
+// @Router /orders [get]
+func (h *OrderHandler) GetOrders(c *gin.Context) {
+	orders, err := h.orderClient.GetOrders(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "failed to get orders " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.FromOrdersResponse(orders))
+}
+
 // GetOrder godoc
 // @Summary Get order
 // @Description Return an order by its ID
