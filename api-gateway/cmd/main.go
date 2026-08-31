@@ -1,17 +1,16 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	appconfig "github.com/amrshaban2005/go-commerce-microservices/api-gateway/config"
 	_ "github.com/amrshaban2005/go-commerce-microservices/api-gateway/docs"
-	grpcclient "github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/grpc-client"
-	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/http/handler"
-	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/http/router"
-	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
+	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/app"
 )
 
 // @title Go Commerce API
@@ -24,44 +23,31 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load app options: %v", err)
 	}
-	if err := appOptions.Validate(); err != nil {
-		log.Fatalf("invalid app options: %v", err)
-	}
 
-	// register routes, run server
-	catalogReadClient, closeReadCatalogClient, err := grpcclient.NewReadCatalogClient(appOptions.CatalogReadGrpcAddr)
+	application, err := app.New(appOptions)
 	if err != nil {
-		log.Fatalf("failed to connect to catalog read grpc server: %v", err.Error())
+		log.Fatalf("failed to create application: %v", err)
 	}
-	defer closeReadCatalogClient()
 
-	catalogWriteClient, closeWriteCatalogClient, err := grpcclient.NewWriteCatalogClient(appOptions.CatalogWriteGrpcAddr)
-	if err != nil {
-		log.Fatalf("failed to connect to catalog write grpc server: %v", err.Error())
+	errCh := make(chan error, 1)
+	application.Run(errCh)
+	log.Printf("api gateway is running on: %s", application.Addr())
+
+	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	select {
+	case <-signalCtx.Done():
+		log.Printf("shutdown signal received")
+	case runErr := <-errCh:
+		log.Printf("api gateway runtime error: %v", runErr)
 	}
-	defer closeWriteCatalogClient()
 
-	orderClient, closeOrderClient, err := grpcclient.NewOrderClient(appOptions.OrderGrpcUrl)
-	if err != nil {
-		log.Fatalf("failed to connect to order grpc server: %v", err.Error())
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err := application.Shutdown(shutdownCtx); err != nil {
+		log.Printf("api gateway shutdown error: %v", err)
 	}
-	defer closeOrderClient()
-
-	prodcutHandler := handler.NewProductHandler(catalogReadClient, catalogWriteClient)
-	orderHandler := handler.NewOrderHandler(orderClient)
-
-	r := gin.Default()
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	api := r.Group("/api/v1")
-
-	router.RegisterProductRoutes(api, prodcutHandler)
-	router.RegisterOrderRoutes(api, orderHandler)
-
-	addr := ":" + appOptions.AppPort
-	log.Printf("api gateway is running on: %s", addr)
-
-	err = r.Run(addr)
-	if err != nil {
-		panic(fmt.Sprintf("failed to connect to server: %v", err.Error()))
-	}
+	log.Printf("api gateway shutdown complete")
 }

@@ -2,7 +2,10 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
+	"net/http"
 	"time"
 
 	orderv1 "github.com/amrshaban2005/go-commerce-microservices/api/gen/go/order/v1"
@@ -12,6 +15,7 @@ import (
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/adapter/messaging"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/adapter/repository"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/database"
+	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/health"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/port"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/service"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/worker"
@@ -85,10 +89,13 @@ func Module() fx.Option {
 			provideOutboxWorker,
 			provideStockReservedConsumer,
 			provideStockNotReservedConsumer,
+			provideHealthHandler,
 		), fx.Invoke(
 			StartOutboxWorker,
 			StartConsumers,
 			StartGRPCServer,
+			StartHealthServer,
+			ManageReadiness,
 		),
 	)
 }
@@ -176,6 +183,10 @@ func provideRabbitMQConnection(
 	})
 
 	return conn, nil
+}
+
+func provideHealthHandler() *health.Handler {
+	return health.New()
 }
 
 func providePublisherChannel(conn *amqp.Connection, lifecycle fx.Lifecycle) (PublisherChannelOut, error) {
@@ -268,22 +279,25 @@ func StartConsumers(
 	lifecycle fx.Lifecycle,
 	stockReservedConsumer *messaging.StockReservedConsumer,
 	stockNotReservedConsumer *messaging.StockNotReservedConsumer,
+	shutdowner fx.Shutdowner,
 	logger *zap.Logger,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
 
 	lifecycle.Append(fx.Hook{
 		OnStart: func(startCtx context.Context) error {
 			logger.Info("starting order consumers")
 
 			go func() {
+				defer close(done)
 				err := messaging.Start(ctx, messaging.Consumers{
 					StockReserved:    stockReservedConsumer,
 					StockNotReserved: stockNotReservedConsumer,
 				})
 
 				if err != nil {
-					logger.Error("consumer stopped with error", zap.Error(err))
+					requestShutdown(shutdowner, logger, "order consumers", err)
 					return
 				}
 
@@ -295,7 +309,7 @@ func StartConsumers(
 		OnStop: func(stopCtx context.Context) error {
 			logger.Info("consumer stopping")
 			cancel()
-			return nil
+			return waitForDone(stopCtx, done, "order consumers")
 		},
 	})
 }
@@ -306,18 +320,22 @@ func StartOutboxWorker(
 	logger *zap.Logger,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
 	lifecycle.Append(fx.Hook{
 		OnStart: func(startCtxctx context.Context) error {
 			logger.Info("starting outbox worker")
 
-			go outboxWorker.Start(ctx)
+			go func() {
+				defer close(done)
+				outboxWorker.Start(ctx)
+			}()
 
 			return nil
 		},
 		OnStop: func(stopCtx context.Context) error {
 			logger.Info("stopping outbox worker")
 			cancel()
-			return nil
+			return waitForDone(stopCtx, done, "outbox worker")
 		},
 	})
 }
@@ -326,6 +344,7 @@ func StartGRPCServer(
 	lifecycle fx.Lifecycle,
 	appOptions *appconfig.AppOptions,
 	orderService port.OrderService,
+	shutdowner fx.Shutdowner,
 	logger *zap.Logger,
 ) {
 	server := grpc.NewServer()
@@ -341,17 +360,91 @@ func StartGRPCServer(
 			logger.Info("order service grpc is running", zap.String("grpc_port", appOptions.GRPCPort))
 
 			go func() {
-				if err := server.Serve(listener); err != nil {
-					logger.Error("grpc server stopped with error", zap.Error(err))
+				if err := server.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+					requestShutdown(shutdowner, logger, "grpc server", err)
 				}
 			}()
 
 			return nil
 		},
-		OnStop: func(ctx context.Context) error {
+		OnStop: func(context.Context) error {
 			logger.Info("stopping grpc server")
 			server.GracefulStop()
 			return nil
 		},
 	})
+}
+
+func StartHealthServer(
+	lifecycle fx.Lifecycle,
+	appOptions *appconfig.AppOptions,
+	healthHandler *health.Handler,
+	shutdowner fx.Shutdowner,
+	logger *zap.Logger,
+) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health/liveness", healthHandler.Liveness)
+	mux.HandleFunc("/health/readiness", healthHandler.Readiness)
+
+	server := &http.Server{
+		Addr:              ":" + appOptions.HealthPort,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	lifecycle.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			listener, err := net.Listen("tcp", server.Addr)
+			if err != nil {
+				return err
+			}
+
+			logger.Info("order service health server is running", zap.String("health_port", appOptions.HealthPort))
+			go func() {
+				if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					requestShutdown(shutdowner, logger, "health server", err)
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			logger.Info("stopping health server")
+			return server.Shutdown(ctx)
+		},
+	})
+}
+
+func ManageReadiness(
+	lifecycle fx.Lifecycle,
+	healthHandler *health.Handler,
+	logger *zap.Logger,
+) {
+	lifecycle.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			healthHandler.SetReady(true)
+			logger.Info("order service is ready")
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			healthHandler.SetReady(false)
+			logger.Info("order service is not ready")
+			return nil
+		},
+	})
+}
+
+func requestShutdown(shutdowner fx.Shutdowner, logger *zap.Logger, component string, runtimeErr error) {
+	logger.Error(component+" stopped with error", zap.Error(runtimeErr))
+	if err := shutdowner.Shutdown(fx.ExitCode(1)); err != nil {
+		logger.Error("failed to request application shutdown", zap.String("component", component), zap.Error(err))
+	}
+}
+
+func waitForDone(ctx context.Context, done <-chan struct{}, component string) error {
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("stop %s: %w", component, ctx.Err())
+	}
 }

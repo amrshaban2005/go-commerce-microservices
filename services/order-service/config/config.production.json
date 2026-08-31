@@ -1,6 +1,7 @@
 {
   "appOptions": {
-    "grpcPort": "6005"
+    "grpcPort": "6005",
+    "healthPort": "7005"
   },
   "logOptions": {
     "level": "info"
