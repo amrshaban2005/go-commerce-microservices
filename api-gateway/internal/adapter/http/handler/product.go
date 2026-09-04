@@ -38,7 +38,7 @@ func (h *ProductHandler) SearchProducts(c *gin.Context) {
 
 	products, err := h.readCatalogClient.SearchProducts(c.Request.Context(), query)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "failed to search products " + err.Error()})
+		writeServiceError(c, err, http.StatusInternalServerError, "failed to search products ")
 		return
 	}
 
@@ -56,7 +56,7 @@ func (h *ProductHandler) SearchProducts(c *gin.Context) {
 func (h *ProductHandler) GetProducts(c *gin.Context) {
 	products, err := h.readCatalogClient.GetProducts(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "failed to get products " + err.Error()})
+		writeServiceError(c, err, http.StatusInternalServerError, "failed to get products ")
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromCatalogProducts(products))
@@ -87,7 +87,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 
 	product, err := h.writeCatalogClient.CreateProducts(c.Request.Context(), req.Name, req.Description, req.Price)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "failed to create products " + err.Error()})
+		writeServiceError(c, err, http.StatusInternalServerError, "failed to create products ")
 		return
 	}
 	c.JSON(http.StatusCreated, dto.FromCatalogProduct(product))

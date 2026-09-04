@@ -36,7 +36,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	}
 	order, err := h.orderClient.CreateOrder(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "failed to create order " + err.Error()})
+		writeServiceError(c, err, http.StatusInternalServerError, "failed to create order ")
 		return
 	}
 	c.JSON(http.StatusCreated, dto.FromOrderResponse(order))
@@ -53,7 +53,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 func (h *OrderHandler) GetOrders(c *gin.Context) {
 	orders, err := h.orderClient.GetOrders(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "failed to get orders " + err.Error()})
+		writeServiceError(c, err, http.StatusInternalServerError, "failed to get orders ")
 		return
 	}
 
@@ -72,7 +72,7 @@ func (h *OrderHandler) GetOrders(c *gin.Context) {
 func (h *OrderHandler) GetOrder(c *gin.Context) {
 	order, err := h.orderClient.GetOrder(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "failed to get order " + err.Error()})
+		writeServiceError(c, err, http.StatusInternalServerError, "failed to get order ")
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromOrderResponse(order))

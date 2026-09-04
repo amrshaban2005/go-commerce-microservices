@@ -11,6 +11,7 @@ import (
 	appconfig "github.com/amrshaban2005/go-commerce-microservices/api-gateway/config"
 	grpcclient "github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/grpc-client"
 	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/http/handler"
+	httpmiddleware "github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/http/middleware"
 	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/http/router"
 	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/health"
 	"github.com/gin-gonic/gin"
@@ -38,20 +39,30 @@ func newApplication(options *appconfig.AppOptions, listen func(network, address 
 		return nil, fmt.Errorf("validate app options: %w", err)
 	}
 
-	readCatalogClient, closeReadCatalogClient, err := grpcclient.NewReadCatalogClient(options.CatalogReadGrpcAddr)
+	readCatalogClient, closeReadCatalogClient, err := grpcclient.NewReadCatalogClient(
+		options.CatalogReadGrpcAddr,
+		options.GRPCReadTimeout,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create catalog read client: %w", err)
 	}
 	closers := []func() error{closeReadCatalogClient}
 
-	writeCatalogClient, closeWriteCatalogClient, err := grpcclient.NewWriteCatalogClient(options.CatalogWriteGrpcAddr)
+	writeCatalogClient, closeWriteCatalogClient, err := grpcclient.NewWriteCatalogClient(
+		options.CatalogWriteGrpcAddr,
+		options.GRPCWriteTimeout,
+	)
 	if err != nil {
 		_ = closeAll(closers)
 		return nil, fmt.Errorf("create catalog write client: %w", err)
 	}
 	closers = append(closers, closeWriteCatalogClient)
 
-	orderClient, closeOrderClient, err := grpcclient.NewOrderClient(options.OrderGrpcUrl)
+	orderClient, closeOrderClient, err := grpcclient.NewOrderClient(
+		options.OrderGrpcUrl,
+		options.GRPCReadTimeout,
+		options.GRPCWriteTimeout,
+	)
 	if err != nil {
 		_ = closeAll(closers)
 		return nil, fmt.Errorf("create order client: %w", err)
@@ -65,13 +76,16 @@ func newApplication(options *appconfig.AppOptions, listen func(network, address 
 	}
 
 	healthHandler := health.New()
-	engine := buildRouter(healthHandler, readCatalogClient, writeCatalogClient, orderClient)
+	engine := buildRouter(healthHandler, readCatalogClient, writeCatalogClient, orderClient, options.RequestTimeout)
 
 	return &Application{
 		HTTPServer: &http.Server{
 			Addr:              ":" + options.AppPort,
 			Handler:           engine,
-			ReadHeaderTimeout: 5 * time.Second,
+			ReadHeaderTimeout: options.ReadHeaderTimeout,
+			ReadTimeout:       options.ReadTimeout,
+			WriteTimeout:      options.WriteTimeout,
+			IdleTimeout:       options.IdleTimeout,
 		},
 		Health:   healthHandler,
 		listener: listener,
@@ -113,6 +127,7 @@ func buildRouter(
 	readCatalogClient *grpcclient.ReadCatalogClient,
 	writeCatalogClient *grpcclient.WriteCatalogClient,
 	orderClient *grpcclient.OrderClient,
+	requestTimeout time.Duration,
 ) *gin.Engine {
 	productHandler := handler.NewProductHandler(readCatalogClient, writeCatalogClient)
 	orderHandler := handler.NewOrderHandler(orderClient)
@@ -123,6 +138,7 @@ func buildRouter(
 	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	api := engine.Group("/api/v1")
+	api.Use(httpmiddleware.RequestTimeout(requestTimeout))
 	router.RegisterProductRoutes(api, productHandler)
 	router.RegisterOrderRoutes(api, orderHandler)
 

@@ -27,6 +27,18 @@ func TestApplicationLifecycleControlsReadiness(t *testing.T) {
 	if application.Health.IsReady() {
 		t.Fatal("application must not be ready before Run")
 	}
+	if application.HTTPServer.ReadHeaderTimeout != 5*time.Second {
+		t.Fatalf("expected 5s read header timeout, got %v", application.HTTPServer.ReadHeaderTimeout)
+	}
+	if application.HTTPServer.ReadTimeout != 15*time.Second {
+		t.Fatalf("expected 15s read timeout, got %v", application.HTTPServer.ReadTimeout)
+	}
+	if application.HTTPServer.WriteTimeout != 15*time.Second {
+		t.Fatalf("expected 15s write timeout, got %v", application.HTTPServer.WriteTimeout)
+	}
+	if application.HTTPServer.IdleTimeout != 60*time.Second {
+		t.Fatalf("expected 60s idle timeout, got %v", application.HTTPServer.IdleTimeout)
+	}
 
 	errCh := make(chan error, 1)
 	application.Run(errCh)
@@ -83,6 +95,13 @@ func testOptions() *appconfig.AppOptions {
 		CatalogReadGrpcAddr:  "127.0.0.1:6001",
 		CatalogWriteGrpcAddr: "127.0.0.1:6002",
 		OrderGrpcUrl:         "127.0.0.1:6005",
+		RequestTimeout:       10 * time.Second,
+		GRPCReadTimeout:      5 * time.Second,
+		GRPCWriteTimeout:     8 * time.Second,
+		ReadHeaderTimeout:    5 * time.Second,
+		ReadTimeout:          15 * time.Second,
+		WriteTimeout:         15 * time.Second,
+		IdleTimeout:          60 * time.Second,
 	}
 }
 
