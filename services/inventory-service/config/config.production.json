@@ -1,4 +1,7 @@
 {
+  "appOptions": {
+    "healthPort": "7004"
+  },
   "logOptions": {
     "level": "info"
   },

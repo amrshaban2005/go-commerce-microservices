@@ -2,7 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
+	"net/http"
+	"sync"
+	"time"
 
 	catalogv1 "github.com/amrshaban2005/go-commerce-microservices/api/gen/go/catalog/v1"
 	applogger "github.com/amrshaban2005/go-commerce-microservices/pkg/logger"
@@ -15,6 +20,7 @@ import (
 	handlingproductcreated "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/handling_product_created"
 	indexingproduct "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/indexing_product"
 	searchingproducts "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/searching_products"
+	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/health"
 	"github.com/mehdihadeli/go-mediatr"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -49,11 +55,14 @@ func Module() fx.Option {
 			provideProductSearchChannel,
 			provideProductCreatedConsumer,
 			provideProductSearchIndexConsumer,
+			provideHealthHandler,
 		),
 		fx.Invoke(
 			StartConsumer,
 			StartGRPCServer,
 			RegisterMediatorHandlers,
+			StartHealthServer,
+			ManageReadiness,
 		),
 	)
 }
@@ -88,6 +97,10 @@ func provideRabbitMQOptions() (*messaging.RabbitMQOptions, error) {
 		return nil, err
 	}
 	return options, options.Validate()
+}
+
+func provideHealthHandler() *health.Handler {
+	return health.New()
 }
 
 func provideLogger(lifecycle fx.Lifecycle) (*zap.Logger, error) {
@@ -224,18 +237,23 @@ func StartConsumer(
 	lifecycle fx.Lifecycle,
 	consumer *messaging.ProductCreatedConsumer,
 	searchIndexConsumer *messaging.ProductSearchIndexConsumer,
+	shutdowner fx.Shutdowner,
 	logger *zap.Logger,
 ) {
-	ctx, cancel := context.WithCancel(context.Background())
+	workerCtx, stopWorkers := context.WithCancel(context.Background())
+	done := make(chan struct{})
 
 	lifecycle.Append(fx.Hook{
-		OnStart: func(startCtx context.Context) error {
+		OnStart: func(context.Context) error {
 			logger.Info("starting catalog projection consumers")
+			var workers sync.WaitGroup
+			workers.Add(2)
 
 			go func() {
-				err := consumer.Start(ctx)
+				defer workers.Done()
+				err := consumer.Start(workerCtx)
 				if err != nil {
-					logger.Error("consumer stopped with error", zap.Error(err))
+					requestShutdown(shutdowner, logger, "product created consumer", err)
 					return
 				}
 
@@ -243,21 +261,27 @@ func StartConsumer(
 			}()
 
 			go func() {
-				err := searchIndexConsumer.Start(ctx)
+				defer workers.Done()
+				err := searchIndexConsumer.Start(workerCtx)
 				if err != nil {
-					logger.Error("product search index consumer stopped with error", zap.Error(err))
+					requestShutdown(shutdowner, logger, "product search index consumer", err)
 					return
 				}
 
 				logger.Info("product search index consumer stopped")
 			}()
 
+			go func() {
+				workers.Wait()
+				close(done)
+			}()
+
 			return nil
 		},
-		OnStop: func(stopCtx context.Context) error {
+		OnStop: func(shutdownCtx context.Context) error {
 			logger.Info("consumer stopping")
-			cancel()
-			return nil
+			stopWorkers()
+			return waitForDone(shutdownCtx, done, "catalog projection consumers")
 		},
 	})
 }
@@ -265,13 +289,14 @@ func StartConsumer(
 func StartGRPCServer(
 	lifecycle fx.Lifecycle,
 	appOptions *appconfig.AppOptions,
+	shutdowner fx.Shutdowner,
 	logger *zap.Logger,
 ) {
 	server := grpc.NewServer()
 	catalogv1.RegisterCatalogReadServiceServer(server, grpcadapter.NewCatalogServer())
 
 	lifecycle.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
+		OnStart: func(context.Context) error {
 			listener, err := net.Listen("tcp", ":"+appOptions.GRPCPort)
 			if err != nil {
 				return err
@@ -280,19 +305,89 @@ func StartGRPCServer(
 			logger.Info("catalog read service grpc is running", zap.String("grpc_port", appOptions.GRPCPort))
 
 			go func() {
-				if err := server.Serve(listener); err != nil {
-					logger.Error("grpc server stopped with error", zap.Error(err))
+				if err := server.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+					requestShutdown(shutdowner, logger, "grpc server", err)
 				}
 			}()
 
 			return nil
 		},
-		OnStop: func(ctx context.Context) error {
+		OnStop: func(context.Context) error {
 			logger.Info("stopping grpc server")
 			server.GracefulStop()
 			return nil
 		},
 	})
+}
+
+func StartHealthServer(
+	lifecycle fx.Lifecycle,
+	appOptions *appconfig.AppOptions,
+	healthHandler *health.Handler,
+	shutdowner fx.Shutdowner,
+	logger *zap.Logger,
+) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health/liveness", healthHandler.Liveness)
+	mux.HandleFunc("/health/readiness", healthHandler.Readiness)
+
+	server := &http.Server{
+		Addr:              ":" + appOptions.HealthPort,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	lifecycle.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			listener, err := net.Listen("tcp", server.Addr)
+			if err != nil {
+				return err
+			}
+
+			logger.Info("catalog read health server is running", zap.String("health_port", appOptions.HealthPort))
+			go func() {
+				if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					requestShutdown(shutdowner, logger, "health server", err)
+				}
+			}()
+			return nil
+		},
+		OnStop: func(shutdownCtx context.Context) error {
+			logger.Info("stopping health server")
+			return server.Shutdown(shutdownCtx)
+		},
+	})
+}
+
+func ManageReadiness(lifecycle fx.Lifecycle, healthHandler *health.Handler, logger *zap.Logger) {
+	lifecycle.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			healthHandler.SetReady(true)
+			logger.Info("catalog read service is ready")
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			healthHandler.SetReady(false)
+			logger.Info("catalog read service is not ready")
+			return nil
+		},
+	})
+}
+
+func requestShutdown(shutdowner fx.Shutdowner, logger *zap.Logger, component string, runtimeErr error) {
+	logger.Error(component+" stopped with error", zap.Error(runtimeErr))
+	if err := shutdowner.Shutdown(fx.ExitCode(1)); err != nil {
+		logger.Error("failed to request application shutdown", zap.String("component", component), zap.Error(err))
+	}
+}
+
+func waitForDone(ctx context.Context, done <-chan struct{}, component string) error {
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("stop %s: %w", component, ctx.Err())
+	}
 }
 
 func RegisterMediatorHandlers(

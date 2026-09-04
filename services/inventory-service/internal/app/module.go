@@ -2,12 +2,18 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
 	"time"
 
 	applogger "github.com/amrshaban2005/go-commerce-microservices/pkg/logger"
+	appconfig "github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/config"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/adapter/messaging"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/adapter/repository"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/database"
+	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/health"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/port"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/service"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/worker"
@@ -48,6 +54,7 @@ type ConsumerParams struct {
 func Module() fx.Option {
 	return fx.Options(
 		fx.Provide(
+			provideAppOptions,
 			providePostgresOptions,
 			provideRabbitMQOptions,
 			provideLogger,
@@ -61,12 +68,23 @@ func Module() fx.Option {
 			providePublisher,
 			provideOutboxWorker,
 			provideReserveStockRequestedConsumer,
+			provideHealthHandler,
 		),
 		fx.Invoke(
 			StartOutboxWorker,
 			StartConsumer,
+			StartHealthServer,
+			ManageReadiness,
 		),
 	)
+}
+
+func provideAppOptions() (*appconfig.AppOptions, error) {
+	options, err := appconfig.LoadAppOptions()
+	if err != nil {
+		return nil, err
+	}
+	return options, options.Validate()
 }
 
 func providePostgresOptions() (*database.PostgresOptions, error) {
@@ -83,6 +101,10 @@ func provideRabbitMQOptions() (*messaging.RabbitMQOptions, error) {
 		return nil, err
 	}
 	return options, options.Validate()
+}
+
+func provideHealthHandler() *health.Handler {
+	return health.New()
 }
 
 func provideLogger(lifecycle fx.Lifecycle) (*zap.Logger, error) {
@@ -216,18 +238,22 @@ func StartOutboxWorker(
 	outboxWorker *worker.OutboxWorker,
 	logger *zap.Logger,
 ) {
-	ctx, cancel := context.WithCancel(context.Background())
+	workerCtx, stopWorker := context.WithCancel(context.Background())
+	done := make(chan struct{})
 
 	lifecycle.Append(fx.Hook{
-		OnStart: func(startCtx context.Context) error {
+		OnStart: func(context.Context) error {
 			logger.Info("starting outbox worker")
-			go outboxWorker.Start(ctx)
+			go func() {
+				defer close(done)
+				outboxWorker.Start(workerCtx)
+			}()
 			return nil
 		},
-		OnStop: func(stopCtx context.Context) error {
+		OnStop: func(shutdownCtx context.Context) error {
 			logger.Info("stopping outbox worker")
-			cancel()
-			return nil
+			stopWorker()
+			return waitForDone(shutdownCtx, done, "outbox worker")
 		},
 	})
 }
@@ -235,18 +261,21 @@ func StartOutboxWorker(
 func StartConsumer(
 	lifecycle fx.Lifecycle,
 	consumer *messaging.ReserveStockRequestedConsumer,
+	shutdowner fx.Shutdowner,
 	logger *zap.Logger,
 ) {
-	ctx, cancel := context.WithCancel(context.Background())
+	workerCtx, stopWorker := context.WithCancel(context.Background())
+	done := make(chan struct{})
 
 	lifecycle.Append(fx.Hook{
-		OnStart: func(startCtx context.Context) error {
+		OnStart: func(context.Context) error {
 			logger.Info("starting reserve stock requested consumer")
 
 			go func() {
-				err := consumer.Start(ctx)
+				defer close(done)
+				err := consumer.Start(workerCtx)
 				if err != nil {
-					logger.Error("consumer stopped with error", zap.Error(err))
+					requestShutdown(shutdowner, logger, "reserve stock requested consumer", err)
 					return
 				}
 
@@ -255,10 +284,80 @@ func StartConsumer(
 
 			return nil
 		},
-		OnStop: func(stopCtx context.Context) error {
+		OnStop: func(shutdownCtx context.Context) error {
 			logger.Info("consumer stopping")
-			cancel()
+			stopWorker()
+			return waitForDone(shutdownCtx, done, "reserve stock requested consumer")
+		},
+	})
+}
+
+func StartHealthServer(
+	lifecycle fx.Lifecycle,
+	options *appconfig.AppOptions,
+	healthHandler *health.Handler,
+	shutdowner fx.Shutdowner,
+	logger *zap.Logger,
+) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health/liveness", healthHandler.Liveness)
+	mux.HandleFunc("/health/readiness", healthHandler.Readiness)
+
+	server := &http.Server{
+		Addr:              ":" + options.HealthPort,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	lifecycle.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			listener, err := net.Listen("tcp", server.Addr)
+			if err != nil {
+				return err
+			}
+
+			logger.Info("inventory health server is running", zap.String("health_port", options.HealthPort))
+			go func() {
+				if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					requestShutdown(shutdowner, logger, "health server", err)
+				}
+			}()
+			return nil
+		},
+		OnStop: func(shutdownCtx context.Context) error {
+			logger.Info("stopping health server")
+			return server.Shutdown(shutdownCtx)
+		},
+	})
+}
+
+func ManageReadiness(lifecycle fx.Lifecycle, healthHandler *health.Handler, logger *zap.Logger) {
+	lifecycle.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			healthHandler.SetReady(true)
+			logger.Info("inventory service is ready")
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			healthHandler.SetReady(false)
+			logger.Info("inventory service is not ready")
 			return nil
 		},
 	})
+}
+
+func requestShutdown(shutdowner fx.Shutdowner, logger *zap.Logger, component string, runtimeErr error) {
+	logger.Error(component+" stopped with error", zap.Error(runtimeErr))
+	if err := shutdowner.Shutdown(fx.ExitCode(1)); err != nil {
+		logger.Error("failed to request application shutdown", zap.String("component", component), zap.Error(err))
+	}
+}
+
+func waitForDone(ctx context.Context, done <-chan struct{}, component string) error {
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("stop %s: %w", component, ctx.Err())
+	}
 }
