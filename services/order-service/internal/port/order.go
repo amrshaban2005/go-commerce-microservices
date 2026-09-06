@@ -2,11 +2,14 @@ package port
 
 import (
 	"context"
+	"errors"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/domain"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/dto"
 	"github.com/google/uuid"
 )
+
+var ErrOrderNotFound = errors.New("order not found")
 
 type OrderRespository interface {
 	CreateWithOutbox(ctx context.Context, order *domain.Order, message *domain.OutboxMessage) error

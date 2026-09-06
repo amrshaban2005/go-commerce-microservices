@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/port"
 	"github.com/google/uuid"
@@ -19,11 +20,12 @@ type StockNotReservedEvent struct {
 }
 
 type StockNotReservedConsumer struct {
-	channel      *amqp.Channel
-	exchange     string
-	queueName    string
-	orderService port.OrderService
-	logger       *zap.Logger
+	channel           *amqp.Channel
+	exchange          string
+	queueName         string
+	orderService      port.OrderService
+	logger            *zap.Logger
+	processingTimeout time.Duration
 }
 
 func NewStockNotReservedConsumer(
@@ -32,13 +34,15 @@ func NewStockNotReservedConsumer(
 	queueName string,
 	orderService port.OrderService,
 	logger *zap.Logger,
+	processingTimeout time.Duration,
 ) *StockNotReservedConsumer {
 	return &StockNotReservedConsumer{
-		channel:      channel,
-		exchange:     exchange,
-		queueName:    queueName,
-		orderService: orderService,
-		logger:       logger,
+		channel:           channel,
+		exchange:          exchange,
+		queueName:         queueName,
+		orderService:      orderService,
+		logger:            logger,
+		processingTimeout: processingTimeout,
 	}
 }
 
@@ -107,6 +111,9 @@ func (c *StockNotReservedConsumer) Start(ctx context.Context) error {
 }
 
 func (c *StockNotReservedConsumer) handleMessage(ctx context.Context, delivery amqp.Delivery) {
+	ctx, cancel := context.WithTimeout(ctx, c.processingTimeout)
+	defer cancel()
+
 	var event StockNotReservedEvent
 
 	if err := json.Unmarshal(delivery.Body, &event); err != nil {

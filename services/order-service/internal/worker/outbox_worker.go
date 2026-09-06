@@ -9,26 +9,29 @@ import (
 )
 
 type OutboxWorker struct {
-	outboxRepo port.OutboxRepository
-	publisher  port.EventPublisher
-	interval   time.Duration
-	batchSize  int
-	logger     *zap.Logger
+	outboxRepo        port.OutboxRepository
+	publisher         port.EventPublisher
+	interval          time.Duration
+	processingTimeout time.Duration
+	batchSize         int
+	logger            *zap.Logger
 }
 
 func NewOutboxWorker(
 	outboxRepo port.OutboxRepository,
 	publisher port.EventPublisher,
 	interval time.Duration,
+	processingTimeout time.Duration,
 	batchSize int,
 	logger *zap.Logger,
 ) *OutboxWorker {
 	return &OutboxWorker{
-		outboxRepo: outboxRepo,
-		publisher:  publisher,
-		interval:   interval,
-		batchSize:  batchSize,
-		logger:     logger,
+		outboxRepo:        outboxRepo,
+		publisher:         publisher,
+		interval:          interval,
+		processingTimeout: processingTimeout,
+		batchSize:         batchSize,
+		logger:            logger,
 	}
 }
 
@@ -45,7 +48,9 @@ func (w *OutboxWorker) Start(ctx context.Context) {
 			return
 
 		case <-ticker.C:
-			w.process(ctx)
+			processCtx, cancel := context.WithTimeout(ctx, w.processingTimeout)
+			w.process(processCtx)
+			cancel()
 		}
 	}
 }

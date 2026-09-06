@@ -170,7 +170,9 @@ func provideRabbitMQConnection(
 	lifecycle fx.Lifecycle,
 	logger *zap.Logger,
 ) (*amqp.Connection, error) {
-	conn, err := amqp.Dial(options.URL)
+	conn, err := amqp.DialConfig(options.URL, amqp.Config{
+		Dial: amqp.DefaultDial(options.ConnectionTimeout),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -233,6 +235,7 @@ func providePublisher(params PublisherParams,
 	return messaging.NewRabbitMQPublisher(
 		params.Channel,
 		params.Options.PublisherExchange,
+		params.Options.PublishTimeout,
 	)
 }
 
@@ -246,6 +249,7 @@ func provideOutboxWorker(
 		outboxRepo,
 		publisher,
 		time.Duration(options.OutboxIntervalSeconds)*time.Second,
+		options.OutboxProcessingTimeout,
 		20,
 		logger.With(zap.String("component", "outbox_worker")),
 	)
@@ -260,6 +264,7 @@ func provideStockReservedConsumer(
 		params.Options.StockReservedQueue,
 		params.OrderService,
 		params.Logger.With(zap.String("component", "stock_reserved_consumer")),
+		params.Options.ConsumerProcessingTimeout,
 	)
 }
 
@@ -272,6 +277,7 @@ func provideStockNotReservedConsumer(
 		params.Options.StockNotReservedQueue,
 		params.OrderService,
 		params.Logger.With(zap.String("component", "stock_not_reserved_consumer")),
+		params.Options.ConsumerProcessingTimeout,
 	)
 }
 

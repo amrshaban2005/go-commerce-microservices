@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/domain"
@@ -58,11 +59,10 @@ func (OutboxDataModel) TableName() string {
 }
 
 func NewOrderRepositoryPG(db *gorm.DB) port.OrderRespository {
-	return &orderRepositoryPG{db}
+	return &orderRepositoryPG{db: db}
 }
 
 func (r orderRepositoryPG) CreateWithOutbox(ctx context.Context, order *domain.Order, message *domain.OutboxMessage) error {
-
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		orderModel := toOrderDataModel(order)
 		if err := tx.Create(&orderModel).Error; err != nil {
@@ -113,6 +113,9 @@ func (r orderRepositoryPG) GetOrder(ctx context.Context, orderID uuid.UUID) (*do
 		Where("id = ? ", orderID).First(&orderModel).Error
 
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, port.ErrOrderNotFound
+		}
 		return nil, err
 	}
 	return toDomainOrder(orderModel, orderModel.Items), nil

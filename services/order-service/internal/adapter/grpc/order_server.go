@@ -2,6 +2,7 @@ package grpcadapter
 
 import (
 	"context"
+	"errors"
 
 	orderv1 "github.com/amrshaban2005/go-commerce-microservices/api/gen/go/order/v1"
 	"github.com/amrshaban2005/go-commerce-microservices/services/order-service/internal/domain"
@@ -41,13 +42,18 @@ func (s *OrderServer) CreateOrder(ctx context.Context, in *orderv1.CreateOrderRe
 			Quantity:    int(item.Quantity),
 		})
 	}
-	order, err := s.svc.CreateOrder(ctx, dto.CreateOrderInput{
+	input := dto.CreateOrderInput{
 		CustomerID: customerID,
 		Items:      itemsInput,
-	})
+	}
+	if err := input.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	order, err := s.svc.CreateOrder(ctx, input)
 
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, serviceError(err, codes.Internal)
 	}
 
 	return &orderv1.CreateOrderResponse{
@@ -63,7 +69,7 @@ func (s *OrderServer) GetOrder(ctx context.Context, in *orderv1.GetOrderRequest)
 	}
 	order, err := s.svc.GetOrder(ctx, orderID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, err.Error())
+		return nil, serviceError(err, codes.Internal)
 	}
 
 	return &orderv1.GetOrderResponse{Order: toProtoOrder(order)}, nil
@@ -72,10 +78,23 @@ func (s *OrderServer) GetOrder(ctx context.Context, in *orderv1.GetOrderRequest)
 func (s *OrderServer) GetOrders(ctx context.Context, in *orderv1.GetOrdersRequest) (*orderv1.GetOrdersResponse, error) {
 	orders, err := s.svc.GetOrders(ctx)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, serviceError(err, codes.Internal)
 	}
 
 	return &orderv1.GetOrdersResponse{Orders: toProtoOrders(orders)}, nil
+}
+
+func serviceError(err error, fallback codes.Code) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return status.Error(codes.DeadlineExceeded, "request timed out")
+	}
+	if errors.Is(err, context.Canceled) {
+		return status.Error(codes.Canceled, "request canceled")
+	}
+	if errors.Is(err, port.ErrOrderNotFound) {
+		return status.Error(codes.NotFound, port.ErrOrderNotFound.Error())
+	}
+	return status.Error(fallback, err.Error())
 }
 
 func toProtoOrders(orders []domain.Order) []*orderv1.Order {
