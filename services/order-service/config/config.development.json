@@ -25,6 +25,8 @@
     "connectionTimeout": "5s",
     "publishTimeout": "5s",
     "outboxProcessingTimeout": "30s",
-    "consumerProcessingTimeout": "10s"
+    "consumerProcessingTimeout": "10s",
+    "consumerRetryDelay": "10s",
+    "consumerMaxAttempts": 3
   }
 }

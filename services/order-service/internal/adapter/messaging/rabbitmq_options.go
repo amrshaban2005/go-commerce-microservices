@@ -18,6 +18,8 @@ type RabbitMQOptions struct {
 	PublishTimeout            time.Duration `mapstructure:"publishTimeout"`
 	OutboxProcessingTimeout   time.Duration `mapstructure:"outboxProcessingTimeout"`
 	ConsumerProcessingTimeout time.Duration `mapstructure:"consumerProcessingTimeout"`
+	ConsumerRetryDelay        time.Duration `mapstructure:"consumerRetryDelay"`
+	ConsumerMaxAttempts       int           `mapstructure:"consumerMaxAttempts"`
 }
 
 func LoadRabbitMQOptions() (*RabbitMQOptions, error) {
@@ -34,6 +36,8 @@ func LoadRabbitMQOptions() (*RabbitMQOptions, error) {
 			"publishTimeout":            "RABBITMQ_PUBLISH_TIMEOUT",
 			"outboxProcessingTimeout":   "OUTBOX_PROCESSING_TIMEOUT",
 			"consumerProcessingTimeout": "RABBITMQ_CONSUMER_PROCESSING_TIMEOUT",
+			"consumerRetryDelay":        "RABBITMQ_CONSUMER_RETRY_DELAY",
+			"consumerMaxAttempts":       "RABBITMQ_CONSUMER_MAX_ATTEMPTS",
 		},
 	)
 }
@@ -69,6 +73,12 @@ func (options *RabbitMQOptions) Validate() error {
 	}
 	if options.ConsumerProcessingTimeout <= 0 {
 		return fmt.Errorf("rabbitMQOptions.consumerProcessingTimeout must be greater than zero")
+	}
+	if options.ConsumerRetryDelay <= 0 {
+		return fmt.Errorf("rabbitMQOptions.consumerRetryDelay must be greater than zero")
+	}
+	if options.ConsumerMaxAttempts <= 0 {
+		return fmt.Errorf("rabbitMQOptions.consumerMaxAttempts must be greater than zero")
 	}
 
 	return nil

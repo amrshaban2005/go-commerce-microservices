@@ -265,6 +265,9 @@ func provideStockReservedConsumer(
 		params.OrderService,
 		params.Logger.With(zap.String("component", "stock_reserved_consumer")),
 		params.Options.ConsumerProcessingTimeout,
+		params.Options.ConsumerRetryDelay,
+		params.Options.ConsumerMaxAttempts,
+		params.Options.PublishTimeout,
 	)
 }
 
@@ -278,6 +281,9 @@ func provideStockNotReservedConsumer(
 		params.OrderService,
 		params.Logger.With(zap.String("component", "stock_not_reserved_consumer")),
 		params.Options.ConsumerProcessingTimeout,
+		params.Options.ConsumerRetryDelay,
+		params.Options.ConsumerMaxAttempts,
+		params.Options.PublishTimeout,
 	)
 }
 

@@ -11,6 +11,7 @@ func TestRabbitMQOptionsValidateRequiresOperationTimeouts(t *testing.T) {
 		StockReservedQueue: "reserved", StockNotReservedQueue: "not-reserved",
 		OutboxIntervalSeconds: 5, ConnectionTimeout: 5 * time.Second, PublishTimeout: 5 * time.Second,
 		OutboxProcessingTimeout: 30 * time.Second, ConsumerProcessingTimeout: 10 * time.Second,
+		ConsumerRetryDelay: 10 * time.Second, ConsumerMaxAttempts: 3,
 	}
 
 	tests := []struct {
@@ -22,6 +23,16 @@ func TestRabbitMQOptionsValidateRequiresOperationTimeouts(t *testing.T) {
 		{name: "missing publish timeout", options: func() RabbitMQOptions {
 			options := valid
 			options.PublishTimeout = 0
+			return options
+		}(), wantErr: true},
+		{name: "missing consumer retry delay", options: func() RabbitMQOptions {
+			options := valid
+			options.ConsumerRetryDelay = 0
+			return options
+		}(), wantErr: true},
+		{name: "missing consumer max attempts", options: func() RabbitMQOptions {
+			options := valid
+			options.ConsumerMaxAttempts = 0
 			return options
 		}(), wantErr: true},
 		{name: "missing outbox processing timeout", options: func() RabbitMQOptions {

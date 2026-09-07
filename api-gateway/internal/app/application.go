@@ -107,8 +107,11 @@ func (a *Application) Run(errCh chan<- error) {
 func (a *Application) Shutdown(ctx context.Context) error {
 	a.Health.SetReady(false)
 
+	shutdownCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
 	var shutdownErrors []error
-	if err := a.HTTPServer.Shutdown(ctx); err != nil {
+	if err := a.HTTPServer.Shutdown(shutdownCtx); err != nil {
 		shutdownErrors = append(shutdownErrors, fmt.Errorf("http server shutdown: %w", err))
 	}
 	if err := closeAll(a.closers); err != nil {

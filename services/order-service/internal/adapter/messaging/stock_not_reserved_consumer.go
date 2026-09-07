@@ -26,6 +26,7 @@ type StockNotReservedConsumer struct {
 	orderService      port.OrderService
 	logger            *zap.Logger
 	processingTimeout time.Duration
+	retry             *retryPolicy
 }
 
 func NewStockNotReservedConsumer(
@@ -35,6 +36,9 @@ func NewStockNotReservedConsumer(
 	orderService port.OrderService,
 	logger *zap.Logger,
 	processingTimeout time.Duration,
+	retryDelay time.Duration,
+	maxAttempts int,
+	publishTimeout time.Duration,
 ) *StockNotReservedConsumer {
 	return &StockNotReservedConsumer{
 		channel:           channel,
@@ -43,6 +47,15 @@ func NewStockNotReservedConsumer(
 		orderService:      orderService,
 		logger:            logger,
 		processingTimeout: processingTimeout,
+		retry: newRetryPolicy(
+			channel,
+			exchange,
+			"stock.notreserved",
+			queueName,
+			maxAttempts,
+			retryDelay,
+			publishTimeout,
+		),
 	}
 }
 
@@ -68,6 +81,9 @@ func (c *StockNotReservedConsumer) Start(ctx context.Context) error {
 		nil,
 	)
 	if err != nil {
+		return err
+	}
+	if err := c.retry.declare(); err != nil {
 		return err
 	}
 
@@ -111,32 +127,38 @@ func (c *StockNotReservedConsumer) Start(ctx context.Context) error {
 }
 
 func (c *StockNotReservedConsumer) handleMessage(ctx context.Context, delivery amqp.Delivery) {
-	ctx, cancel := context.WithTimeout(ctx, c.processingTimeout)
+	processingCtx, cancel := context.WithTimeout(ctx, c.processingTimeout)
 	defer cancel()
 
 	var event StockNotReservedEvent
 
 	if err := json.Unmarshal(delivery.Body, &event); err != nil {
 		c.logger.Error("failed to unmarshal stock not reserved event", zap.Error(err))
-		_ = delivery.Nack(false, false)
+		if deadLetterErr := c.retry.deadLetter(ctx, delivery, "invalid JSON"); deadLetterErr != nil {
+			c.logger.Error("failed to dead-letter invalid stock not reserved event", zap.Error(deadLetterErr))
+		}
 		return
 	}
 
 	messageID, err := uuid.Parse(event.MessageID)
 	if err != nil {
 		c.logger.Error("failed to parse message id", zap.String("message_id", event.MessageID), zap.Error(err))
-		_ = delivery.Nack(false, false)
+		if deadLetterErr := c.retry.deadLetter(ctx, delivery, "invalid message_id"); deadLetterErr != nil {
+			c.logger.Error("failed to dead-letter stock not reserved event", zap.Error(deadLetterErr))
+		}
 		return
 	}
 	orderID, err := uuid.Parse(event.OrderID)
 	if err != nil {
 		c.logger.Error("failed to parse order id", zap.String("order_id", event.OrderID), zap.Error(err))
-		_ = delivery.Nack(false, false)
+		if deadLetterErr := c.retry.deadLetter(ctx, delivery, "invalid order_id"); deadLetterErr != nil {
+			c.logger.Error("failed to dead-letter stock not reserved event", zap.Error(deadLetterErr))
+		}
 		return
 	}
 
 	err = c.orderService.HandleRejectOrder(
-		ctx,
+		processingCtx,
 		orderID,
 		messageID,
 		delivery.Body,
@@ -148,11 +170,19 @@ func (c *StockNotReservedConsumer) handleMessage(ctx context.Context, delivery a
 			zap.String("order_id", event.OrderID),
 			zap.Error(err),
 		)
-		_ = delivery.Nack(false, true)
+		disposition, retryErr := c.retry.retry(ctx, delivery, "processing failed")
+		if retryErr != nil {
+			c.logger.Error("failed to schedule stock not reserved event failure", zap.Error(retryErr))
+		} else {
+			c.logger.Warn(string(disposition), zap.String("message_id", event.MessageID))
+		}
 		return
 	}
 
-	_ = delivery.Ack(false)
+	if err := delivery.Ack(false); err != nil {
+		c.logger.Error("failed to acknowledge stock not reserved event", zap.Error(err))
+		return
+	}
 
 	c.logger.Info(
 		"stock not reserved event consumed",
