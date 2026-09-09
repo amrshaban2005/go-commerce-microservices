@@ -89,6 +89,7 @@ dev-check:
 	make fmt
 	make test
 	make vet
+	make test-e2e
 
 dev-start:
 	make dev-up

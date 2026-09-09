@@ -14,15 +14,18 @@ func NewRedisClient(
 	logger *zap.Logger,
 ) *redis.Client {
 	client := redis.NewClient(&redis.Options{
-		Addr:     options.Addr,
-		Password: options.Password,
-		DB:       options.DB,
+		Addr:        options.Addr,
+		Password:    options.Password,
+		DB:          options.DB,
+		DialTimeout: options.ConnectionTimeout,
 	})
 
 	lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			logger.Info("connecting to redis", zap.String("addr", options.Addr))
-			return client.Ping(ctx).Err()
+			pingCtx, cancel := context.WithTimeout(ctx, options.ConnectionTimeout)
+			defer cancel()
+			return client.Ping(pingCtx).Err()
 		},
 		OnStop: func(ctx context.Context) error {
 			logger.Info("closing redis connection")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/database"
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/port"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -21,11 +22,13 @@ type inboxMessageMongoRepository struct {
 	collection *mongo.Collection
 }
 
-func NewInboxMessageMongoRepository(db *mongo.Database) (port.InboxRepository, error) {
+func NewInboxMessageMongoRepository(db *mongo.Database, config *database.MongoOptions) (port.InboxRepository, error) {
 	collection := db.Collection("inbox_messages")
+	ctx, cancel := context.WithTimeout(context.Background(), config.ConnectionTimeout)
+	defer cancel()
 
 	_, err := collection.Indexes().CreateOne(
-		context.Background(),
+		ctx,
 		mongo.IndexModel{
 			Keys: bson.M{"message_id": 1},
 			Options: options.Index().

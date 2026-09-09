@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/database"
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/domain"
@@ -36,7 +35,7 @@ func NewProductSearchRepositoryElasticsearch(
 		index:  options.ProductsIndex,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), options.ConnectionTimeout)
 	defer cancel()
 	if err := repository.ensureIndex(ctx); err != nil {
 		return nil, err

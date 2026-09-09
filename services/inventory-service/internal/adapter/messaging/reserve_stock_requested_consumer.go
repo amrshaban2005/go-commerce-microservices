@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/domain"
 	"github.com/amrshaban2005/go-commerce-microservices/services/inventory-service/internal/port"
@@ -24,11 +25,12 @@ type Item struct {
 }
 
 type ReserveStockRequestedConsumer struct {
-	channel          *amqp.Channel
-	exchange         string
-	queueName        string
-	inventoryService port.InventoryService
-	logger           *zap.Logger
+	channel           *amqp.Channel
+	exchange          string
+	queueName         string
+	inventoryService  port.InventoryService
+	logger            *zap.Logger
+	processingTimeout time.Duration
 }
 
 func NewReserveStockRequestedConsumer(
@@ -37,13 +39,15 @@ func NewReserveStockRequestedConsumer(
 	queueName string,
 	inventoryService port.InventoryService,
 	logger *zap.Logger,
+	processingTimeout time.Duration,
 ) *ReserveStockRequestedConsumer {
 	return &ReserveStockRequestedConsumer{
-		channel:          channel,
-		exchange:         exchange,
-		queueName:        queueName,
-		inventoryService: inventoryService,
-		logger:           logger,
+		channel:           channel,
+		exchange:          exchange,
+		queueName:         queueName,
+		inventoryService:  inventoryService,
+		logger:            logger,
+		processingTimeout: processingTimeout,
 	}
 }
 
@@ -112,6 +116,9 @@ func (c *ReserveStockRequestedConsumer) Start(ctx context.Context) error {
 }
 
 func (c *ReserveStockRequestedConsumer) handleMessage(ctx context.Context, delivery amqp.Delivery) {
+	processingCtx, cancel := context.WithTimeout(ctx, c.processingTimeout)
+	defer cancel()
+
 	var event ReserveStockRequestedEvent
 
 	if err := json.Unmarshal(delivery.Body, &event); err != nil {
@@ -149,7 +156,7 @@ func (c *ReserveStockRequestedConsumer) handleMessage(ctx context.Context, deliv
 	}
 
 	err = c.inventoryService.HandleReserveStockRequested(
-		ctx,
+		processingCtx,
 		messageID,
 		orderID,
 		eventItems,

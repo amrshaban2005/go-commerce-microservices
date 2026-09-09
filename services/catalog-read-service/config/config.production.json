@@ -8,21 +8,26 @@
   },
   "mongoOptions": {
     "uri": "",
-    "database": "catalog_read_db"
+    "database": "catalog_read_db",
+    "connectionTimeout": "5s"
   },
   "redisOptions": {
     "addr": "localhost:6379",
     "password": "",
-    "db": 0
+    "db": 0,
+    "connectionTimeout": "5s"
   },
   "elasticsearchOptions": {
     "url": "http://elasticsearch:9200",
-    "productsIndex": "catalog-products"
+    "productsIndex": "catalog-products",
+    "connectionTimeout": "5s"
   },
   "rabbitMQOptions": {
     "url": "",
     "exchange": "catalog.events",
     "productCreatedQueue": "catalog-read.product-created",
-    "productSearchQueue": "catalog-search.product-created"
+    "productSearchQueue": "catalog-search.product-created",
+    "connectionTimeout": "5s",
+    "consumerProcessingTimeout": "10s"
   }
 }

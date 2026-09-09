@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -17,7 +16,7 @@ func ConnectMongo(logger *zap.Logger, config *MongoOptions) (*mongo.Client, erro
 		return nil, fmt.Errorf("failed to connect mongo: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), config.ConnectionTimeout)
 	defer cancel()
 
 	if err := client.Ping(ctx, nil); err != nil {

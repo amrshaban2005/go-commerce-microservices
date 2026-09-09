@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v9"
@@ -14,7 +15,10 @@ func NewElasticsearchClient(options *ElasticsearchOptions) (*elasticsearch.Clien
 		return nil, fmt.Errorf("create Elasticsearch client: %w", err)
 	}
 
-	response, err := client.Info()
+	ctx, cancel := context.WithTimeout(context.Background(), options.ConnectionTimeout)
+	defer cancel()
+
+	response, err := client.Info(client.Info.WithContext(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("connect to Elasticsearch: %w", err)
 	}

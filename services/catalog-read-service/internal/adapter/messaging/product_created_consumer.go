@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/domain"
 	handlingproductcreated "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/handling_product_created"
@@ -22,10 +23,11 @@ type ProductCreatedEvent struct {
 }
 
 type ProductCreatedConsumer struct {
-	channel   *amqp.Channel
-	exchange  string
-	queueName string
-	logger    *zap.Logger
+	channel           *amqp.Channel
+	exchange          string
+	queueName         string
+	logger            *zap.Logger
+	processingTimeout time.Duration
 }
 
 func NewProductCreatedConsumer(
@@ -33,12 +35,14 @@ func NewProductCreatedConsumer(
 	exchange string,
 	queueName string,
 	logger *zap.Logger,
+	processingTimeout time.Duration,
 ) *ProductCreatedConsumer {
 	return &ProductCreatedConsumer{
-		channel:   channel,
-		exchange:  exchange,
-		queueName: queueName,
-		logger:    logger,
+		channel:           channel,
+		exchange:          exchange,
+		queueName:         queueName,
+		logger:            logger,
+		processingTimeout: processingTimeout,
 	}
 }
 
@@ -107,6 +111,9 @@ func (c *ProductCreatedConsumer) Start(ctx context.Context) error {
 }
 
 func (c *ProductCreatedConsumer) handleMessage(ctx context.Context, delivery amqp.Delivery) {
+	processingCtx, cancel := context.WithTimeout(ctx, c.processingTimeout)
+	defer cancel()
+
 	var event ProductCreatedEvent
 
 	if err := json.Unmarshal(delivery.Body, &event); err != nil {
@@ -124,7 +131,7 @@ func (c *ProductCreatedConsumer) handleMessage(ctx context.Context, delivery amq
 	}
 
 	_, err := mediatr.Send[*handlingproductcreated.Command, *struct{}](
-		ctx,
+		processingCtx,
 		&handlingproductcreated.Command{
 			MessageID: event.MessageID,
 			Product:   product,

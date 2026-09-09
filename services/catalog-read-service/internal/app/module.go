@@ -155,7 +155,9 @@ func provideRabbitMQConnection(
 	lifecycle fx.Lifecycle,
 	logger *zap.Logger,
 ) (*amqp.Connection, error) {
-	conn, err := amqp.Dial(options.URL)
+	conn, err := amqp.DialConfig(options.URL, amqp.Config{
+		Dial: amqp.DefaultDial(options.ConnectionTimeout),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +219,7 @@ func provideProductCreatedConsumer(
 		options.Exchange,
 		options.ProductCreatedQueue,
 		logger.With(zap.String("component", "product_created_consumer")),
+		options.ConsumerProcessingTimeout,
 	)
 }
 
@@ -230,6 +233,7 @@ func provideProductSearchIndexConsumer(
 		options.Exchange,
 		options.ProductSearchQueue,
 		logger.With(zap.String("component", "product_search_index_consumer")),
+		options.ConsumerProcessingTimeout,
 	)
 }
 

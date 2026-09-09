@@ -12,11 +12,15 @@
     "user": "catalog_write_user",
     "password": "",
     "database": "catalog_write_db",
-    "sslMode": "disable"
+    "sslMode": "disable",
+    "connectionTimeout": "5s"
   },
   "rabbitMQOptions": {
     "url": "",
     "exchange": "catalog.events",
-    "outboxIntervalSeconds": 5
+    "outboxIntervalSeconds": 5,
+    "connectionTimeout": "5s",
+    "publishTimeout": "5s",
+    "outboxProcessingTimeout": "30s"
   }
 }

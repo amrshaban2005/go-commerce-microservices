@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -13,10 +14,11 @@ type RabbitMQPublisher struct {
 	channel  *amqp.Channel
 	exchange string
 	returns  <-chan amqp.Return
+	timeout  time.Duration
 	mu       sync.Mutex
 }
 
-func NewRabbitMQPublisher(channel *amqp.Channel, exchange string) (*RabbitMQPublisher, error) {
+func NewRabbitMQPublisher(channel *amqp.Channel, exchange string, timeout time.Duration) (*RabbitMQPublisher, error) {
 	if err := channel.ExchangeDeclare(
 		exchange,
 		"topic",
@@ -37,10 +39,14 @@ func NewRabbitMQPublisher(channel *amqp.Channel, exchange string) (*RabbitMQPubl
 		channel:  channel,
 		exchange: exchange,
 		returns:  channel.NotifyReturn(make(chan amqp.Return, 1)),
+		timeout:  timeout,
 	}, nil
 }
 
 func (p *RabbitMQPublisher) Publish(ctx context.Context, eventType string, payload []byte) error {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

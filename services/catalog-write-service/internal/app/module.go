@@ -120,7 +120,9 @@ func provideDB(postgresOptions *database.PostgresOptions, lifeCycle fx.Lifecycle
 }
 
 func providePublisher(options *messaging.RabbitMQOptions, lifecycle fx.Lifecycle, logger *zap.Logger) (port.EventPublisher, error) {
-	conn, err := amqp.Dial(options.URL)
+	conn, err := amqp.DialConfig(options.URL, amqp.Config{
+		Dial: amqp.DefaultDial(options.ConnectionTimeout),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +145,7 @@ func providePublisher(options *messaging.RabbitMQOptions, lifecycle fx.Lifecycle
 		},
 	})
 
-	return messaging.NewRabbitMQPublisher(channel, options.Exchange)
+	return messaging.NewRabbitMQPublisher(channel, options.Exchange, options.PublishTimeout)
 }
 
 func provideOutboxWorker(outboxRepo port.OutboxRepository, publisher port.EventPublisher, options *messaging.RabbitMQOptions, logger *zap.Logger) *worker.OutboxWorker {
@@ -151,6 +153,7 @@ func provideOutboxWorker(outboxRepo port.OutboxRepository, publisher port.EventP
 		outboxRepo,
 		publisher,
 		time.Duration(options.OutboxIntervalSeconds)*time.Second,
+		options.OutboxProcessingTimeout,
 		20, logger)
 }
 

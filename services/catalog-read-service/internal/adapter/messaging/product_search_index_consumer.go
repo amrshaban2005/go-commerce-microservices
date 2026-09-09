@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/domain"
 	indexingproduct "github.com/amrshaban2005/go-commerce-microservices/services/catalog-read-service/internal/features/products/indexing_product"
@@ -13,10 +14,11 @@ import (
 )
 
 type ProductSearchIndexConsumer struct {
-	channel   *amqp.Channel
-	exchange  string
-	queueName string
-	logger    *zap.Logger
+	channel           *amqp.Channel
+	exchange          string
+	queueName         string
+	logger            *zap.Logger
+	processingTimeout time.Duration
 }
 
 func NewProductSearchIndexConsumer(
@@ -24,12 +26,14 @@ func NewProductSearchIndexConsumer(
 	exchange string,
 	queueName string,
 	logger *zap.Logger,
+	processingTimeout time.Duration,
 ) *ProductSearchIndexConsumer {
 	return &ProductSearchIndexConsumer{
-		channel:   channel,
-		exchange:  exchange,
-		queueName: queueName,
-		logger:    logger,
+		channel:           channel,
+		exchange:          exchange,
+		queueName:         queueName,
+		logger:            logger,
+		processingTimeout: processingTimeout,
 	}
 }
 
@@ -98,6 +102,9 @@ func (c *ProductSearchIndexConsumer) Start(ctx context.Context) error {
 }
 
 func (c *ProductSearchIndexConsumer) handleMessage(ctx context.Context, delivery amqp.Delivery) {
+	processingCtx, cancel := context.WithTimeout(ctx, c.processingTimeout)
+	defer cancel()
+
 	var event ProductCreatedEvent
 	if err := json.Unmarshal(delivery.Body, &event); err != nil {
 		c.logger.Error("failed to unmarshal product created search event", zap.Error(err))
@@ -106,7 +113,7 @@ func (c *ProductSearchIndexConsumer) handleMessage(ctx context.Context, delivery
 	}
 
 	_, err := mediatr.Send[*indexingproduct.Command, *struct{}](
-		ctx,
+		processingCtx,
 		&indexingproduct.Command{
 			Product: domain.Product{
 				ID:          event.ProductID,

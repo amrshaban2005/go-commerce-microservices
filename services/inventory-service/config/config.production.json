@@ -11,13 +11,18 @@
     "user": "inventory_user",
     "password": "",
     "database": "inventory_db",
-    "sslMode": "disable"
+    "sslMode": "disable",
+    "connectionTimeout": "5s"
   },
   "rabbitMQOptions": {
     "url": "",
     "consumerExchange": "order.events",
     "publisherExchange": "inventory.events",
     "reserveStockQueue": "inventory-read.order-events",
-    "outboxIntervalSeconds": 5
+    "outboxIntervalSeconds": 5,
+    "connectionTimeout": "5s",
+    "publishTimeout": "5s",
+    "outboxProcessingTimeout": "30s",
+    "consumerProcessingTimeout": "10s"
   }
 }
