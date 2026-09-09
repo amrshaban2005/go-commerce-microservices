@@ -2,31 +2,32 @@ name: CI
 
 on:
   push:
+    branches:
+      - master
   pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  go:
-    name: Go checks
+  quality:
+    name: Quality
     runs-on: ubuntu-latest
-    env:
-      MODULES: >-
-        api-gateway
-        api/gen/go
-        pkg
-        services/catalog-read-service
-        services/catalog-write-service
-        services/inventory-service
-        services/order-service
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.work
           cache-dependency-path: |
@@ -34,31 +35,67 @@ jobs:
             go.work.sum
 
       - name: Check formatting
-        run: |
-          unformatted="$(gofmt -l $(git ls-files '*.go'))"
-          if [ -n "$unformatted" ]; then
-            echo "The following files are not formatted:"
-            echo "$unformatted"
-            exit 1
-          fi
+        run: make fmt-check
 
       - name: Run vet
-        run: |
-          for module in $MODULES; do
-            echo "Vetting $module"
-            (cd "$module" && go vet ./...)
-          done
+        run: make vet
 
-      - name: Run tests
-        run: |
-          for module in $MODULES; do
-            echo "Testing $module"
-            (cd "$module" && go test ./...)
-          done
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          install-only: true
 
-      - name: Compile workspace
-        run: |
-          for module in $MODULES; do
-            echo "Building $module"
-            (cd "$module" && go build ./...)
-          done
+      - name: Run lint
+        run: make lint
+
+  test:
+    name: Unit tests
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            **/go.sum
+            go.work.sum
+
+      - name: Run unit tests
+        run: make test-ci
+
+      - name: Upload failed test output
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: go-test-output-${{ github.run_attempt }}
+          path: artifacts/test-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+  build:
+    name: Build applications
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            **/go.sum
+            go.work.sum
+
+      - name: Compile deployable applications
+        run: make build

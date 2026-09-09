@@ -1,4 +1,6 @@
-MODULES := \
+SHELL := /bin/bash
+
+GO_MODULES := \
 	api-gateway \
 	api/gen/go \
 	pkg \
@@ -6,6 +8,15 @@ MODULES := \
 	services/catalog-write-service \
 	services/inventory-service \
 	services/order-service
+
+APP_MODULES := \
+	api-gateway \
+	services/catalog-read-service \
+	services/catalog-write-service \
+	services/inventory-service \
+	services/order-service
+
+.PHONY: fmt fmt-check vet lint test test-ci build
 
 install-tools:
 	./scripts/install-tools.sh
@@ -67,19 +78,51 @@ swagger:
 fmt:
 	gofmt -w $$(git ls-files '*.go')
 
+fmt-check:
+	@unformatted="$$(gofmt -l $$(git ls-files '*.go'))"; \
+	if [ -n "$$unformatted" ]; then \
+		echo "The following files are not formatted:"; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
+
 test:
-	@for module in $(MODULES); do \
+	@for module in $(GO_MODULES); do \
 		echo "Testing $$module"; \
-		(cd $$module && gotestsum ./... -count=1 -v) || exit 1; \
+		(cd $$module && go test ./... -count=1) || exit 1; \
 	done
+
+test-ci:
+	@rm -rf artifacts/test-results
+	@mkdir -p artifacts/test-results
+	@set -o pipefail; status=0; \
+	for module in $(GO_MODULES); do \
+		echo "Testing $$module"; \
+		report="$$(echo "$$module" | tr '/' '-').json"; \
+		(cd "$$module" && go test ./... -count=1 -json) \
+			| tee "artifacts/test-results/$$report" || status=1; \
+	done; \
+	exit $$status
 
 test-e2e:
 	cd services/test/e2e && gotestsum ./... -count=1 -v
 
 vet:
-	@for module in $(MODULES); do \
+	@for module in $(GO_MODULES); do \
 		echo "Vetting $$module"; \
-		(cd $$module && go vet ./...) || exit 1; \
+		(cd "$$module" && go vet ./...) || exit 1; \
+	done
+
+lint:
+	@for module in $(GO_MODULES); do \
+		echo "Linting $$module"; \
+		(cd "$$module" && golangci-lint run --config "$(CURDIR)/.golangci.yml" ./...) || exit 1; \
+	done
+
+build:
+	@for module in $(APP_MODULES); do \
+		echo "Building $$module"; \
+		(cd "$$module" && go build ./...) || exit 1; \
 	done
 
 generate-mock:
@@ -106,4 +149,3 @@ prod-start:
 
 prod-stop:
 	make deploy-down
-

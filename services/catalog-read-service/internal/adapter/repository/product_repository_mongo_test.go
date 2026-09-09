@@ -1,3 +1,5 @@
+//go:build integration
+
 package repository
 
 import (
@@ -18,7 +20,7 @@ func Test_Upsert(t *testing.T) {
 
 	container, err := mongodb.Run(ctx, "mongo:7")
 	if err != nil {
-		t.Errorf("start mongo container but got %v", err)
+		t.Fatalf("start mongo container: %v", err)
 	}
 	defer func() {
 		if err := container.Terminate(ctx); err != nil {
@@ -27,14 +29,18 @@ func Test_Upsert(t *testing.T) {
 	}()
 	uri, err := container.ConnectionString(ctx)
 	if err != nil {
-		t.Errorf("get mongo connection string: %v", err)
+		t.Fatalf("get mongo connection string: %v", err)
 	}
 
 	client, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
-		t.Errorf("expected connect to mongo db but got %v", err)
+		t.Fatalf("connect to mongo db: %v", err)
 	}
-	defer client.Disconnect(ctx)
+	defer func() {
+		if err := client.Disconnect(ctx); err != nil {
+			t.Errorf("disconnect mongo client: %v", err)
+		}
+	}()
 
 	db := client.Database("catalog_read_db_test")
 

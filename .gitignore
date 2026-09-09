@@ -2,6 +2,7 @@
 **/.env
 
 bin
+artifacts/
 **/tmp
 **/*.log
 

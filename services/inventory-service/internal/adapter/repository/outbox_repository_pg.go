@@ -63,19 +63,6 @@ func (r outboxRepositoryPG) IncrementRetry(ctx context.Context, id uuid.UUID) er
 	return r.db.WithContext(ctx).Model(&OutboxDataModel{}).Where("id = ?", id).Update("retry_count", gorm.Expr("retry_count + 1")).Error
 }
 
-func toOutboxDataModel(message *domain.OutboxMessage) OutboxDataModel {
-	return OutboxDataModel{
-		ID:            message.ID,
-		AggregateID:   message.AggregateID,
-		AggregateType: message.AggregateType,
-		EventType:     message.EventType,
-		Payload:       message.Payload,
-		RetryCount:    message.RetryCount,
-		CreatedAt:     message.CreatedAt,
-		ProcessedAt:   message.ProcessedAt,
-	}
-}
-
 func fromOutboxDataModel(message *OutboxDataModel) domain.OutboxMessage {
 	return domain.OutboxMessage{
 		ID:            message.ID,

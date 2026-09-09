@@ -52,7 +52,9 @@ func (r *productRepositoryMongo) FindAll(ctx context.Context) ([]domain.Product,
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	var models []ProductReadModel
 	if err := cursor.All(ctx, &models); err != nil {

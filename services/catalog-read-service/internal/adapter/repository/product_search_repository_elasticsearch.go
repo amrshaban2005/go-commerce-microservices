@@ -71,7 +71,9 @@ func (r *productSearchRepositoryElasticsearch) Index(
 	if err != nil {
 		return fmt.Errorf("index product search document: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	if response.IsError() {
 		return elasticsearchResponseError("index product search document", response.Status(), response.Body)
@@ -107,7 +109,9 @@ func (r *productSearchRepositoryElasticsearch) Search(
 	if err != nil {
 		return nil, fmt.Errorf("search product documents: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	if response.IsError() {
 		return nil, elasticsearchResponseError("search product documents", response.Status(), response.Body)
@@ -146,7 +150,9 @@ func (r *productSearchRepositoryElasticsearch) ensureIndex(ctx context.Context) 
 	if err != nil {
 		return fmt.Errorf("check product search index: %w", err)
 	}
-	response.Body.Close()
+	if err := response.Body.Close(); err != nil {
+		return fmt.Errorf("close product search index response: %w", err)
+	}
 
 	if response.StatusCode == 200 {
 		return nil
@@ -175,7 +181,9 @@ func (r *productSearchRepositoryElasticsearch) ensureIndex(ctx context.Context) 
 	if err != nil {
 		return fmt.Errorf("create product search index: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	if response.IsError() {
 		return elasticsearchResponseError("create product search index", response.Status(), response.Body)

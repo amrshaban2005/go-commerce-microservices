@@ -8,9 +8,7 @@ import (
 )
 
 func NewElasticsearchClient(options *ElasticsearchOptions) (*elasticsearch.Client, error) {
-	client, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{options.URL},
-	})
+	client, err := elasticsearch.New(elasticsearch.WithAddresses(options.URL))
 	if err != nil {
 		return nil, fmt.Errorf("create Elasticsearch client: %w", err)
 	}
@@ -22,7 +20,9 @@ func NewElasticsearchClient(options *ElasticsearchOptions) (*elasticsearch.Clien
 	if err != nil {
 		return nil, fmt.Errorf("connect to Elasticsearch: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	if response.IsError() {
 		return nil, fmt.Errorf("connect to Elasticsearch: %s", response.Status())

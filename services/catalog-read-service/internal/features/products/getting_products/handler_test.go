@@ -10,11 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type fakeProductRepository struct {
-	products []domain.Product
-	err      error
-}
-
 type fakeProductCacheRepository struct {
 	products  []domain.Product
 	getErr    error
@@ -33,14 +28,6 @@ func (f *fakeProductCacheRepository) SetProducts(ctx context.Context, products [
 }
 
 func (f *fakeProductCacheRepository) DeleteProducts(ctx context.Context) error {
-	return nil
-}
-
-func (f fakeProductRepository) FindAll(ctx context.Context) ([]domain.Product, error) {
-	return f.products, f.err
-}
-
-func (f fakeProductRepository) Upsert(ctx context.Context, product domain.Product) error {
 	return nil
 }
 
