@@ -10,11 +10,20 @@ services:
       DB_PASSWORD: ${ORDER_DB_PASSWORD}
 
       RABBITMQ_URL: ${RABBITMQ_URL}
-    ports:
-      - "6005:6005"
+    expose:
+      - "6005"
+      - "7005"
     networks:
       - ecommerce-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:7005/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    stop_signal: SIGTERM
+    stop_grace_period: 45s
 
   catalog-write-service:
     image: catalog-write-service:local
@@ -23,11 +32,20 @@ services:
       DB_HOST: postgres
       DB_PASSWORD: ${CATALOG_WRITE_DB_PASSWORD}
       RABBITMQ_URL: ${RABBITMQ_URL}
-    ports:
-      - "6002:6002"
+    expose:
+      - "6002"
+      - "7002"
     networks:
       - ecommerce-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:7002/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    stop_signal: SIGTERM
+    stop_grace_period: 45s
 
   inventory-service:
     image: inventory-service:local
@@ -39,6 +57,16 @@ services:
     networks:
       - ecommerce-network
     restart: unless-stopped
+    expose:
+      - "7004"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:7004/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    stop_signal: SIGTERM
+    stop_grace_period: 45s
 
   catalog-read-service:
     image: catalog-read-service:local
@@ -46,22 +74,40 @@ services:
       APP_ENV: production
       MONGO_URI: ${MONGO_URI}
       RABBITMQ_URL: ${RABBITMQ_URL}
+      REDIS_ADDR: redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-    ports:
-      - "6001:6001"
+    expose:
+      - "6001"
+      - "7001"
     networks:
       - ecommerce-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:7001/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    stop_signal: SIGTERM
+    stop_grace_period: 45s
 
   api-gateway:
     image: api-gateway:local
     environment:
       APP_ENV: production
     ports:
-      - "8080:8080"
+      - "${API_GATEWAY_HOST_PORT:-8080}:8080"
     networks:
       - ecommerce-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    stop_signal: SIGTERM
+    stop_grace_period: 45s
 
 networks:
   ecommerce-network:

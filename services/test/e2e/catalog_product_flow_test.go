@@ -50,20 +50,28 @@ func TestCatalogProductFlow(t *testing.T) {
 		t.Fatal("expected created product id")
 	}
 
-	readResp, err := readClient.GetProducts(ctx, &catalogv1.GetProductsRequest{})
-	if err != nil {
-		t.Fatalf("get product %v", err)
-	}
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
 
-	for _, product := range readResp.Products {
-		if product.Id == productID {
-			return
+	for {
+		readResp, err := readClient.GetProducts(ctx, &catalogv1.GetProductsRequest{})
+		if err != nil {
+			if ctx.Err() != nil {
+				t.Fatalf("product %s was not projected before deadline: %v", productID, ctx.Err())
+			}
+			t.Fatalf("get products: %v", err)
 		}
-	}
 
-	select {
-	case <-ctx.Done():
-		t.Fatalf("product %s was not projected to catalog read service", productID)
-	case <-time.After(500 * time.Millisecond):
+		for _, product := range readResp.Products {
+			if product.Id == productID {
+				return
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			t.Fatalf("product %s was not projected before deadline: %v", productID, ctx.Err())
+		case <-ticker.C:
+		}
 	}
 }

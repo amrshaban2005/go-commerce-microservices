@@ -18,7 +18,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /out/catalog-write-service ./cmd
 
 FROM alpine:3.22
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates curl
 
 WORKDIR /app
 
@@ -27,6 +27,6 @@ COPY --from=builder /workspace/services/catalog-write-service/config/*.json ./co
 
 ENV CONFIG_PATH=/app/config
 
-EXPOSE 6005
+EXPOSE 6002 7002
 
 ENTRYPOINT ["./catalog-write-service"]

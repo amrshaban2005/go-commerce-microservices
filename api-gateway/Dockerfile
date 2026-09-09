@@ -18,7 +18,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /out/api-gateway ./cmd
 
 FROM alpine:3.22
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates curl
 
 WORKDIR /app
 
@@ -28,6 +28,6 @@ COPY --from=builder /workspace/api-gateway/config/*.json ./config/
 ENV APP_ENV=production
 ENV CONFIG_PATH=/app/config
 
-EXPOSE 6005
+EXPOSE 8080
 
 ENTRYPOINT ["./api-gateway"]

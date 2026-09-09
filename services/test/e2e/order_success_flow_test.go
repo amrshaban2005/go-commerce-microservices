@@ -46,22 +46,10 @@ func Test_SuccessOrderFlow(t *testing.T) {
 	}
 
 	orderID := response.Order.Id
-	for {
-		response, err := orderClient.GetOrder(ctx, &orderv1.GetOrderRequest{OrderId: orderID})
-		if err != nil {
-			t.Fatalf("error gettig order id %v error %v", orderID, err)
-		}
-		if response.Order.Status == "CONFIRMED" {
-			return
-		}
-
-		select {
-		case <-ctx.Done():
-			t.Fatalf("order not confimred %s ", orderID)
-		case <-time.After(500 * time.Millisecond):
-		}
+	if orderID == "" {
+		t.Fatal("expected created order id")
 	}
-
+	waitForOrderStatus(t, ctx, orderClient, orderID, "CONFIRMED")
 }
 
 func Test_FailOrderFlow(t *testing.T) {
@@ -97,20 +85,40 @@ func Test_FailOrderFlow(t *testing.T) {
 	}
 
 	orderID := response.Order.Id
+	if orderID == "" {
+		t.Fatal("expected created order id")
+	}
+	waitForOrderStatus(t, ctx, orderClient, orderID, "FAILED")
+}
+
+func waitForOrderStatus(
+	t *testing.T,
+	ctx context.Context,
+	client orderv1.OrderServiceClient,
+	orderID string,
+	expectedStatus string,
+) {
+	t.Helper()
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
 	for {
-		response, err := orderClient.GetOrder(ctx, &orderv1.GetOrderRequest{OrderId: orderID})
+		response, err := client.GetOrder(ctx, &orderv1.GetOrderRequest{OrderId: orderID})
 		if err != nil {
-			t.Fatalf("error gettig order id %v error %v", orderID, err)
+			if ctx.Err() != nil {
+				t.Fatalf("order %s did not reach %s before deadline: %v", orderID, expectedStatus, ctx.Err())
+			}
+			t.Fatalf("get order %s: %v", orderID, err)
 		}
-		if response.Order.Status == "FAILED" {
+		if response.Order.Status == expectedStatus {
 			return
 		}
 
 		select {
 		case <-ctx.Done():
-			t.Fatalf("order not failed %s ", orderID)
-		case <-time.After(500 * time.Millisecond):
+			t.Fatalf("order %s did not reach %s before deadline: %v", orderID, expectedStatus, ctx.Err())
+		case <-ticker.C:
 		}
 	}
-
 }

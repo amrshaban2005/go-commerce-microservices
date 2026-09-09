@@ -16,7 +16,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /out/inventory-service ./cmd
 
 FROM alpine:3.22
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates curl
 
 WORKDIR /app
 
@@ -25,6 +25,6 @@ COPY --from=builder /workspace/services/inventory-service/config/*.json ./config
 
 ENV CONFIG_PATH=/app/config
 
-EXPOSE 6005
+EXPOSE 7004
 
 ENTRYPOINT ["./inventory-service"]

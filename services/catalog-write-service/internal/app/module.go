@@ -91,7 +91,7 @@ func provideLogger(lifeCycle fx.Lifecycle) (*zap.Logger, error) {
 
 	lifeCycle.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			return logger.Sync()
+			return applogger.Sync(logger)
 		},
 	})
 

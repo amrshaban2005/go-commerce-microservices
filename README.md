@@ -284,6 +284,18 @@ Includes:
 - Order Service
 - Inventory Service
 
+### Service ports
+
+| Service | Business port | Management health port |
+|---|---:|---:|
+| API Gateway | `8080` HTTP | `8080` |
+| Catalog Read Service | `6001` gRPC | `7001` |
+| Catalog Write Service | `6002` gRPC | `7002` |
+| Inventory Service | None | `7004` |
+| Order Service | `6005` gRPC | `7005` |
+
+The backend gRPC ports and management health ports are available only inside the Compose network. API Gateway is the only application service published to the host, and its host binding defaults to `8080`; set `API_GATEWAY_HOST_PORT` to override it.
+
 ## Development Commands
 
 Install local tools:

@@ -93,7 +93,6 @@ dev-check:
 
 dev-start:
 	make dev-up
-	sleep 5
 	make migrate-up
 
 dev-stop:
@@ -101,11 +100,10 @@ dev-stop:
 
 prod-start:
 	make run-docker-build
-	make deploy-up
-	sleep 5
+	make dev-up
 	make migrate-up
+	make deploy-up
 
 prod-stop:
 	make deploy-down
-
 
