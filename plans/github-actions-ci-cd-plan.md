@@ -309,6 +309,7 @@ Measure service traffic, latency, failures, and asynchronous processing so slow 
 8. Expose Prometheus-compatible metrics and create Grafana dashboards for each service and the overall system.
 9. Add structured request, correlation, and trace identifiers to logs and propagate them through HTTP, gRPC, and message metadata.
 10. Add distributed traces so a slow request or message can be broken down by service, database, cache, and broker time.
+11. correlation ID
 
 ## Stage 10 — Authentication and authorization through proxy forwarding
 

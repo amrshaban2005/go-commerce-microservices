@@ -9,6 +9,8 @@ GO_MODULES := \
 	services/inventory-service \
 	services/order-service
 
+CHECK_MODULES := $(GO_MODULES) services/test
+
 APP_MODULES := \
 	api-gateway \
 	services/catalog-read-service \
@@ -16,7 +18,7 @@ APP_MODULES := \
 	services/inventory-service \
 	services/order-service
 
-.PHONY: fmt fmt-check vet lint test test-ci build
+.PHONY: fmt fmt-check vet lint test test-ci test-integration test-e2e seed-e2e build dev-check
 
 install-tools:
 	./scripts/install-tools.sh
@@ -104,17 +106,23 @@ test-ci:
 	done; \
 	exit $$status
 
+test-integration:
+	cd services/catalog-read-service && go test -tags=integration ./internal/adapter/repository/... -count=1 -timeout=2m
+
 test-e2e:
-	cd services/test/e2e && gotestsum ./... -count=1 -v
+	cd services/test && go test ./e2e/... -count=1 -v -timeout=2m
+
+seed-e2e:
+	./scripts/seed-e2e.sh
 
 vet:
-	@for module in $(GO_MODULES); do \
+	@for module in $(CHECK_MODULES); do \
 		echo "Vetting $$module"; \
 		(cd "$$module" && go vet ./...) || exit 1; \
 	done
 
 lint:
-	@for module in $(GO_MODULES); do \
+	@for module in $(CHECK_MODULES); do \
 		echo "Linting $$module"; \
 		(cd "$$module" && golangci-lint run --config "$(CURDIR)/.golangci.yml" ./...) || exit 1; \
 	done
@@ -129,10 +137,7 @@ generate-mock:
 	./scripts/generate-mocks.sh
 
 dev-check:
-	make fmt
-	make test
-	make vet
-	make test-e2e
+	./scripts/dev-check.sh
 
 dev-start:
 	make dev-up

@@ -2,99 +2,57 @@ package e2e
 
 import (
 	"context"
-	"log"
-	"os"
+	"fmt"
+	"net/http"
 	"testing"
 	"time"
-
-	orderv1 "github.com/amrshaban2005/go-commerce-microservices/api/gen/go/order/v1"
-	"github.com/amrshaban2005/go-commerce-microservices/pkg/configloader"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
-func Test_SuccessOrderFlow(t *testing.T) {
-	if err := configloader.LoadDotEnv("../.env"); err != nil {
-		log.Println("No local .env file found; using system environment variables")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	conn, err := grpc.NewClient(os.Getenv("ORDER_GRPC_ADDR"), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		t.Fatalf("connect order service: %v", err)
-	}
-	defer conn.Close()
-
-	orderClient := orderv1.NewOrderServiceClient(conn)
-	response, err := orderClient.CreateOrder(ctx, &orderv1.CreateOrderRequest{
-		CustomerId: "98d3a6c2-57fc-490b-9baf-6acc0eed3d72",
-		Items: []*orderv1.CreateOrderItem{{
-			ProductId:   "1c47247b-5f3e-41ae-bd3e-c3191ee63b99",
-			ProductName: "keyboard",
-			UnitPrice:   60,
-			Quantity:    1,
-		}, {
-			ProductId:   "a6500dba-cb86-42a8-86d2-033091952b15",
-			ProductName: "mouse",
-			UnitPrice:   100,
-			Quantity:    1,
-		}},
-	})
-	if err != nil {
-		t.Fatalf("error creating order %v", err)
-	}
-
-	orderID := response.Order.Id
-	if orderID == "" {
-		t.Fatal("expected created order id")
-	}
-	waitForOrderStatus(t, ctx, orderClient, orderID, "CONFIRMED")
+func TestSuccessOrderFlow(t *testing.T) {
+	testOrderFlow(t, 1, "CONFIRMED")
 }
 
-func Test_FailOrderFlow(t *testing.T) {
-	if err := configloader.LoadDotEnv("../.env"); err != nil {
-		log.Println("No local .env file found; using system environment variables")
-	}
+func TestFailedOrderFlow(t *testing.T) {
+	testOrderFlow(t, 100, "FAILED")
+}
+
+func testOrderFlow(t *testing.T, keyboardQuantity int, expectedStatus string) {
+	t.Helper()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	conn, err := grpc.NewClient(os.Getenv("ORDER_GRPC_ADDR"), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		t.Fatalf("connect order service: %v", err)
-	}
-	defer conn.Close()
+	client := newAPIClient()
+	created := orderResponse{}
+	client.doJSON(t, ctx, http.MethodPost, "/api/v1/orders", map[string]any{
+		"customer_id": "98d3a6c2-57fc-490b-9baf-6acc0eed3d72",
+		"order_items": []map[string]any{
+			{
+				"product_id":   "1c47247b-5f3e-41ae-bd3e-c3191ee63b99",
+				"product_name": "keyboard",
+				"unit_price":   60,
+				"quantity":     keyboardQuantity,
+			},
+			{
+				"product_id":   "a6500dba-cb86-42a8-86d2-033091952b15",
+				"product_name": "mouse",
+				"unit_price":   100,
+				"quantity":     1,
+			},
+		},
+	}, http.StatusCreated, &created)
 
-	orderClient := orderv1.NewOrderServiceClient(conn)
-	response, err := orderClient.CreateOrder(ctx, &orderv1.CreateOrderRequest{
-		CustomerId: "98d3a6c2-57fc-490b-9baf-6acc0eed3d72",
-		Items: []*orderv1.CreateOrderItem{{
-			ProductId:   "1c47247b-5f3e-41ae-bd3e-c3191ee63b99",
-			ProductName: "keyboard",
-			UnitPrice:   60,
-			Quantity:    100,
-		}, {
-			ProductId:   "a6500dba-cb86-42a8-86d2-033091952b15",
-			ProductName: "mouse",
-			UnitPrice:   100,
-			Quantity:    1,
-		}},
-	})
-	if err != nil {
-		t.Fatalf("error creating order %v", err)
-	}
-
-	orderID := response.Order.Id
-	if orderID == "" {
+	if created.ID == "" {
 		t.Fatal("expected created order id")
 	}
-	waitForOrderStatus(t, ctx, orderClient, orderID, "FAILED")
+
+	waitForOrderStatus(t, ctx, client, created.ID, expectedStatus)
 }
 
 func waitForOrderStatus(
 	t *testing.T,
 	ctx context.Context,
-	client orderv1.OrderServiceClient,
+	client *apiClient,
 	orderID string,
 	expectedStatus string,
 ) {
@@ -104,14 +62,17 @@ func waitForOrderStatus(
 	defer ticker.Stop()
 
 	for {
-		response, err := client.GetOrder(ctx, &orderv1.GetOrderRequest{OrderId: orderID})
-		if err != nil {
-			if ctx.Err() != nil {
-				t.Fatalf("order %s did not reach %s before deadline: %v", orderID, expectedStatus, ctx.Err())
-			}
-			t.Fatalf("get order %s: %v", orderID, err)
-		}
-		if response.Order.Status == expectedStatus {
+		order := orderResponse{}
+		client.doJSON(
+			t,
+			ctx,
+			http.MethodGet,
+			fmt.Sprintf("/api/v1/orders/%s", orderID),
+			nil,
+			http.StatusOK,
+			&order,
+		)
+		if order.Status == expectedStatus {
 			return
 		}
 
