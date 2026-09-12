@@ -1,6 +1,7 @@
 {
   "appOptions": {
     "appPort": "8080",
+    "managementPort": "7070",
     "catalogReadGrpcAddr":"127.0.0.1:6001",
     "catalogWriteGrpcAddr":"127.0.0.1:6002",
     "orderGrpcUrl":"127.0.0.1:6005",

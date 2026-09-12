@@ -288,13 +288,44 @@ Includes:
 
 | Service | Business port | Management health port |
 |---|---:|---:|
-| API Gateway | `8080` HTTP | `8080` |
+| API Gateway | `8080` HTTP | `7070` |
 | Catalog Read Service | `6001` gRPC | `7001` |
 | Catalog Write Service | `6002` gRPC | `7002` |
 | Inventory Service | None | `7004` |
 | Order Service | `6005` gRPC | `7005` |
 
 The backend gRPC ports and management health ports are available only inside the Compose network. API Gateway is the only application service published to the host, and its host binding defaults to `8080`; set `API_GATEWAY_HOST_PORT` to override it.
+
+## Observability
+
+The first observability phase collects API gateway HTTP metrics with Prometheus and displays them in Grafana. The gateway exposes health and `/metrics` on its private management port `7070`; this port is not published to the host.
+
+Start the containerized application, then start Prometheus and Grafana:
+
+```bash
+make prod-start
+make observability-up
+```
+
+Open Grafana at `http://localhost:3000` and use the local credentials `admin` / `admin`. The provisioned dashboard is under the `Go Commerce` folder.
+
+Generate one minute of read-only API traffic for the dashboard:
+
+```bash
+make observability-traffic
+```
+
+The generator also sends expected `400` and `404` requests so the dashboard contains several status codes. Override its defaults when needed:
+
+```bash
+DURATION_SECONDS=120 CONCURRENCY=10 BASE_URL=http://localhost:8080 make observability-traffic
+```
+
+Stop the observability stack:
+
+```bash
+make observability-down
+```
 
 ## Development Commands
 

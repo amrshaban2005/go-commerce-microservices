@@ -16,6 +16,9 @@ func TestLoadAppOptionsParsesTimeouts(t *testing.T) {
 	if options.RequestTimeout != 10*time.Second {
 		t.Fatalf("expected 10s request timeout, got %v", options.RequestTimeout)
 	}
+	if options.ManagementPort != "7070" {
+		t.Fatalf("expected management port 7070, got %q", options.ManagementPort)
+	}
 	if options.IdleTimeout != 60*time.Second {
 		t.Fatalf("expected 60s idle timeout, got %v", options.IdleTimeout)
 	}
@@ -60,6 +63,7 @@ func TestAppOptionsValidate(t *testing.T) {
 func validOptions() AppOptions {
 	return AppOptions{
 		AppPort:              "8080",
+		ManagementPort:       "7070",
 		CatalogReadGrpcAddr:  "catalog-read-service:6001",
 		CatalogWriteGrpcAddr: "catalog-write-service:6002",
 		OrderGrpcUrl:         "order-service:6005",

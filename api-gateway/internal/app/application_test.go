@@ -18,8 +18,14 @@ func TestApplicationLifecycleControlsReadiness(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	listener := newBlockingListener()
+	managementListener := newBlockingListener()
+	listenCalls := 0
 	application, err := newApplication(testOptions(), func(_, _ string) (net.Listener, error) {
-		return listener, nil
+		listenCalls++
+		if listenCalls == 1 {
+			return listener, nil
+		}
+		return managementListener, nil
 	})
 	if err != nil {
 		t.Fatalf("create application: %v", err)
@@ -48,7 +54,7 @@ func TestApplicationLifecycleControlsReadiness(t *testing.T) {
 
 	request := httptest.NewRequest(http.MethodGet, "/health/readiness", nil)
 	response := httptest.NewRecorder()
-	application.HTTPServer.Handler.ServeHTTP(response, request)
+	application.ManagementServer.Handler.ServeHTTP(response, request)
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("expected readiness status %d, got %d", http.StatusOK, response.Code)
@@ -59,6 +65,15 @@ func TestApplicationLifecycleControlsReadiness(t *testing.T) {
 	}
 	if body["status"] != "UP" {
 		t.Fatalf("expected readiness UP, got %q", body["status"])
+	}
+
+	metricsResponse := httptest.NewRecorder()
+	application.ManagementServer.Handler.ServeHTTP(
+		metricsResponse,
+		httptest.NewRequest(http.MethodGet, "/metrics", nil),
+	)
+	if metricsResponse.Code != http.StatusOK {
+		t.Fatalf("expected metrics status %d, got %d", http.StatusOK, metricsResponse.Code)
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -92,6 +107,7 @@ func TestNewRejectsMissingOptions(t *testing.T) {
 func testOptions() *appconfig.AppOptions {
 	return &appconfig.AppOptions{
 		AppPort:              "0",
+		ManagementPort:       "0",
 		CatalogReadGrpcAddr:  "127.0.0.1:6001",
 		CatalogWriteGrpcAddr: "127.0.0.1:6002",
 		OrderGrpcUrl:         "127.0.0.1:6005",

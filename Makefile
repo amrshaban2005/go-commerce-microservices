@@ -18,7 +18,7 @@ APP_MODULES := \
 	services/inventory-service \
 	services/order-service
 
-.PHONY: fmt fmt-check vet lint test test-ci test-integration test-e2e seed-e2e build dev-check
+.PHONY: fmt fmt-check vet lint test test-ci test-integration test-e2e seed-e2e build dev-check observability-up observability-down observability-traffic
 
 install-tools:
 	./scripts/install-tools.sh
@@ -34,6 +34,15 @@ deploy-up:
 
 deploy-down:
 	./scripts/deploy-down.sh
+
+observability-up:
+	docker compose -f deployments/docker-compose.observability.yml up -d
+
+observability-down:
+	docker compose -f deployments/docker-compose.observability.yml down
+
+observability-traffic:
+	./scripts/generate-observability-traffic.sh
 
 dev-reset:
 	./scripts/dev-reset.sh

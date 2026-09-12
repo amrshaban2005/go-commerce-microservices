@@ -28,6 +28,6 @@ COPY --from=builder /workspace/api-gateway/config/*.json ./config/
 ENV APP_ENV=production
 ENV CONFIG_PATH=/app/config
 
-EXPOSE 8080
+EXPOSE 8080 7070
 
 ENTRYPOINT ["./api-gateway"]

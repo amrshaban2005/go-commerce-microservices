@@ -97,11 +97,13 @@ services:
       APP_ENV: production
     ports:
       - "${API_GATEWAY_HOST_PORT:-8080}:8080"
+    expose:
+      - "7070"
     networks:
       - ecommerce-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health/readiness"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:7070/health/readiness"]
       interval: 5s
       timeout: 3s
       retries: 12

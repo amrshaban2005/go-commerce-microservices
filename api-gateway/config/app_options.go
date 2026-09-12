@@ -9,6 +9,7 @@ import (
 
 type AppOptions struct {
 	AppPort              string        `mapstructure:"appPort"`
+	ManagementPort       string        `mapstructure:"managementPort"`
 	CatalogReadGrpcAddr  string        `mapstructure:"catalogReadGrpcAddr"`
 	CatalogWriteGrpcAddr string        `mapstructure:"catalogWriteGrpcAddr"`
 	OrderGrpcUrl         string        `mapstructure:"orderGrpcUrl"`
@@ -26,6 +27,7 @@ func LoadAppOptions() (*AppOptions, error) {
 		"appOptions",
 		map[string]string{
 			"appPort":              "APP_PORT",
+			"managementPort":       "MANAGEMENT_PORT",
 			"catalogReadGrpcAddr":  "CATALOG_READ_GRPC_ADDR",
 			"catalogWriteGrpcAddr": "CATALOG_WRITE_GRPC_ADDR",
 			"orderGrpcUrl":         "ORDER_GRPC_ADDR",
@@ -46,6 +48,7 @@ func (options *AppOptions) Validate() error {
 		value string
 	}{
 		{name: "appPort", value: options.AppPort},
+		{name: "managementPort", value: options.ManagementPort},
 		{name: "catalogReadGrpcAddr", value: options.CatalogReadGrpcAddr},
 		{name: "catalogWriteGrpcAddr", value: options.CatalogWriteGrpcAddr},
 		{name: "orderGrpcUrl", value: options.OrderGrpcUrl},

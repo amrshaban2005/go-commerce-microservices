@@ -295,21 +295,88 @@ Complete CD by extending the tag workflow. After all images are published succes
 
 ### Overview
 
-Measure service traffic, latency, failures, and asynchronous processing so slow or unhealthy behavior can be detected and investigated with metrics, traces, and correlated logs.
+Build observability in small, verifiable phases. Start with API gateway metrics, then add dependency metrics, centralized logs, distributed traces, and alerts. Each phase should work before moving to the next one.
 
-### Changes and steps
+### Phase 1 — API gateway metrics and dashboard
 
-1. Add HTTP middleware and gRPC interceptors that record request count, error count, in-flight requests, and request-duration histograms.
-2. Record latency by stable service, route template, gRPC method, and status labels without using request IDs or resource IDs as metric labels.
-3. Calculate and display p50, p95, and p99 latency for HTTP and gRPC requests over explicit time windows.
-4. Measure database query duration and database connection-pool usage.
-5. Measure RabbitMQ publishing duration, consumer processing duration, failures, retries, and queue backlog.
-6. Measure end-to-end business latency for order processing and catalog write-to-read projection.
-7. Collect request rate, error rate, and latency together so latency is interpreted with its traffic volume and failure rate.
-8. Expose Prometheus-compatible metrics and create Grafana dashboards for each service and the overall system.
-9. Add structured request, correlation, and trace identifiers to logs and propagate them through HTTP, gRPC, and message metadata.
-10. Add distributed traces so a slow request or message can be broken down by service, database, cache, and broker time.
-11. correlation ID
+#### Overview
+
+Learn the metrics path end to end with one service: the API gateway exposes metrics, Prometheus collects and stores them, and Grafana displays them.
+
+#### Changes and steps
+
+1. Add HTTP middleware that records:
+   - Total requests by method, route template, and status code.
+   - Total failed requests by method and route template.
+   - Current in-flight requests.
+   - Request duration in a Prometheus histogram.
+2. Use route templates such as `/api/v1/orders/:id`; never use request IDs, order IDs, product IDs, or raw URLs as metric labels.
+3. Expose `GET /metrics` on the API gateway's private management port, alongside its health endpoints.
+4. Add Prometheus with a scrape configuration for the API gateway.
+5. Add Grafana with a provisioned Prometheus data source.
+6. Add one starter dashboard showing request rate, error rate, in-flight requests, and p50, p95, and p99 latency over an explicit time window.
+7. Verify that requests through the gateway appear in Prometheus and the Grafana dashboard.
+
+### Phase 2 — Service, database, and messaging metrics
+
+#### Overview
+
+Extend metrics to the backend services and the dependencies that can slow or block a business flow.
+
+#### Changes and steps
+
+1. Add gRPC server interceptors for request count, status, in-flight requests, and duration.
+2. Expose each service's metrics on its existing private management port.
+3. Measure database operation duration and connection-pool usage.
+4. Measure RabbitMQ publish duration, consumer processing duration, failures, retries, and dead-letter outcomes.
+5. Collect RabbitMQ queue depth and consumer count from RabbitMQ's Prometheus endpoint.
+6. Measure outbox pending tasks and task age.
+7. Add service and dependency panels to Grafana.
+
+### Phase 3 — Centralized structured logs and correlation IDs
+
+#### Overview
+
+Collect all container logs in one place and make one workflow searchable across services without introducing tracing yet.
+
+#### Changes and steps
+
+1. Keep production logs as structured JSON with stable fields such as service, environment, component, and level.
+2. Create a correlation ID at the gateway or accept a valid incoming one.
+3. Propagate the correlation ID through HTTP, gRPC metadata, outbox records, and RabbitMQ message headers.
+4. Include the correlation ID in logs from every service that handles the workflow.
+5. Add Loki for log storage and Alloy to collect Docker container logs and forward them to Loki.
+6. Add Loki as a Grafana data source and verify that an order workflow can be found by correlation ID.
+
+### Phase 4 — Distributed tracing
+
+#### Overview
+
+Add traces after metrics and correlated logs are understood, so a slow synchronous or asynchronous workflow can be broken down by component.
+
+#### Changes and steps
+
+1. Instrument HTTP and gRPC boundaries with OpenTelemetry.
+2. Instrument important database and RabbitMQ operations.
+3. Persist trace context in outbox records and propagate it in RabbitMQ headers.
+4. Send OTLP traces to Alloy and store them in Tempo.
+5. Add Tempo as a Grafana data source.
+6. Add trace IDs to structured logs and configure links between metrics, logs, and traces in Grafana.
+7. Verify one order trace across the gateway, order service, RabbitMQ, and inventory service.
+
+### Phase 5 — Business metrics and alerts
+
+#### Overview
+
+Add a small set of actionable business measurements and alerts after the telemetry pipeline is reliable.
+
+#### Changes and steps
+
+1. Measure end-to-end order-processing latency and catalog write-to-read projection latency.
+2. Create alerts for service unavailability, sustained error rate, sustained p95 latency, RabbitMQ backlog, and old outbox tasks.
+3. Define each alert with a clear threshold, evaluation window, and expected operator action.
+4. Use Grafana Alerting initially; add a separate Alertmanager only if routing requirements become more complex.
+5. Generate controlled failures and confirm that alerts fire and recover as expected.
 
 ## Stage 10 — Authentication and authorization through proxy forwarding
 

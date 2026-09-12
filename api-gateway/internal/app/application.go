@@ -14,17 +14,20 @@ import (
 	httpmiddleware "github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/http/middleware"
 	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/adapter/http/router"
 	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/health"
+	"github.com/amrshaban2005/go-commerce-microservices/api-gateway/internal/observability"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 type Application struct {
-	HTTPServer *http.Server
-	Health     *health.Handler
+	HTTPServer       *http.Server
+	ManagementServer *http.Server
+	Health           *health.Handler
 
-	listener net.Listener
-	closers  []func() error
+	listener           net.Listener
+	managementListener net.Listener
+	closers            []func() error
 }
 
 func New(options *appconfig.AppOptions) (*Application, error) {
@@ -76,7 +79,17 @@ func newApplication(options *appconfig.AppOptions, listen func(network, address 
 	}
 
 	healthHandler := health.New()
-	engine := buildRouter(healthHandler, readCatalogClient, writeCatalogClient, orderClient, options.RequestTimeout)
+	registry := observability.NewRegistry()
+	httpMetrics := observability.NewHTTPMetrics(registry)
+	engine := buildRouter(readCatalogClient, writeCatalogClient, orderClient, httpMetrics, options.RequestTimeout)
+	managementHandler := buildManagementHandler(healthHandler, observability.Handler(registry))
+
+	managementListener, err := listen("tcp", ":"+options.ManagementPort)
+	if err != nil {
+		_ = listener.Close()
+		_ = closeAll(closers)
+		return nil, fmt.Errorf("listen on management port %s: %w", options.ManagementPort, err)
+	}
 
 	return &Application{
 		HTTPServer: &http.Server{
@@ -87,9 +100,18 @@ func newApplication(options *appconfig.AppOptions, listen func(network, address 
 			WriteTimeout:      options.WriteTimeout,
 			IdleTimeout:       options.IdleTimeout,
 		},
-		Health:   healthHandler,
-		listener: listener,
-		closers:  closers,
+		ManagementServer: &http.Server{
+			Addr:              ":" + options.ManagementPort,
+			Handler:           managementHandler,
+			ReadHeaderTimeout: options.ReadHeaderTimeout,
+			ReadTimeout:       options.ReadTimeout,
+			WriteTimeout:      options.WriteTimeout,
+			IdleTimeout:       options.IdleTimeout,
+		},
+		Health:             healthHandler,
+		listener:           listener,
+		managementListener: managementListener,
+		closers:            closers,
 	}, nil
 }
 
@@ -100,6 +122,13 @@ func (a *Application) Run(errCh chan<- error) {
 		if err := a.HTTPServer.Serve(a.listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			a.Health.SetReady(false)
 			errCh <- fmt.Errorf("http server: %w", err)
+		}
+	}()
+
+	go func() {
+		if err := a.ManagementServer.Serve(a.managementListener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			a.Health.SetReady(false)
+			errCh <- fmt.Errorf("management server: %w", err)
 		}
 	}()
 }
@@ -114,6 +143,9 @@ func (a *Application) Shutdown(ctx context.Context) error {
 	if err := a.HTTPServer.Shutdown(shutdownCtx); err != nil {
 		shutdownErrors = append(shutdownErrors, fmt.Errorf("http server shutdown: %w", err))
 	}
+	if err := a.ManagementServer.Shutdown(shutdownCtx); err != nil {
+		shutdownErrors = append(shutdownErrors, fmt.Errorf("management server shutdown: %w", err))
+	}
 	if err := closeAll(a.closers); err != nil {
 		shutdownErrors = append(shutdownErrors, err)
 	}
@@ -125,19 +157,22 @@ func (a *Application) Addr() net.Addr {
 	return a.listener.Addr()
 }
 
+func (a *Application) ManagementAddr() net.Addr {
+	return a.managementListener.Addr()
+}
+
 func buildRouter(
-	healthHandler *health.Handler,
 	readCatalogClient *grpcclient.ReadCatalogClient,
 	writeCatalogClient *grpcclient.WriteCatalogClient,
 	orderClient *grpcclient.OrderClient,
+	httpMetrics *observability.HTTPMetrics,
 	requestTimeout time.Duration,
 ) *gin.Engine {
 	productHandler := handler.NewProductHandler(readCatalogClient, writeCatalogClient)
 	orderHandler := handler.NewOrderHandler(orderClient)
 
-	engine := gin.Default()
-	engine.GET("/health/liveness", gin.WrapF(healthHandler.Liveness))
-	engine.GET("/health/readiness", gin.WrapF(healthHandler.Readiness))
+	engine := gin.New()
+	engine.Use(httpMetrics.Middleware(), gin.Logger(), gin.Recovery())
 	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	api := engine.Group("/api/v1")
@@ -146,6 +181,14 @@ func buildRouter(
 	router.RegisterOrderRoutes(api, orderHandler)
 
 	return engine
+}
+
+func buildManagementHandler(healthHandler *health.Handler, metricsHandler http.Handler) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health/liveness", healthHandler.Liveness)
+	mux.HandleFunc("/health/readiness", healthHandler.Readiness)
+	mux.Handle("/metrics", metricsHandler)
+	return mux
 }
 
 func closeAll(closers []func() error) error {

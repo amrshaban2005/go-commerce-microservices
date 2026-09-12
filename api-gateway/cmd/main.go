@@ -32,6 +32,7 @@ func main() {
 	errCh := make(chan error, 1)
 	application.Run(errCh)
 	log.Printf("api gateway is running on: %s", application.Addr())
+	log.Printf("api gateway management server is running on: %s", application.ManagementAddr())
 
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
